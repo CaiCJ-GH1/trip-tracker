@@ -26,8 +26,8 @@
   --sans:     'Sora', sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;overflow-x:hidden}
+html{scroll-behavior:smooth;font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:1rem;min-height:100vh;overflow-x:hidden}
 
 /* ── Background grid ── */
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
@@ -36,8 +36,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 header{position:sticky;top:0;z-index:100;background:rgba(8,12,18,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#006699);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 20px rgba(0,212,255,.3)}
-.logo-text{font-size:15px;font-weight:700;letter-spacing:.3px;color:var(--text)}
-.logo-sub{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+.logo-text{font-size:1.07rem;font-weight:700;letter-spacing:.3px;color:var(--text)}
+.logo-sub{font-size:0.72rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
 .hstats{display:flex;gap:20px}
 .hstat{text-align:right}
 .hstat-v{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--accent)}
@@ -45,7 +45,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(8,12,18,.85);backdrop-f
 
 /* ── Tab ── */
 .tabs{display:flex;gap:2px;padding:0 24px;background:rgba(8,12,18,.6);border-bottom:1px solid var(--border);overflow-x:auto}
-.tab{padding:11px 20px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;user-select:none}
+.tab{padding:11px 20px;font-size:0.86rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;user-select:none}
 .tab:hover{color:var(--text)}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
 
@@ -57,36 +57,36 @@ header{position:sticky;top:0;z-index:100;background:rgba(8,12,18,.85);backdrop-f
 .main{padding:20px;min-height:calc(100vh - 96px)}
 
 /* ── Section labels ── */
-.slabel{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.slabel{font-size:0.72rem;font-weight:600;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
 
 /* ── Cards ── */
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
-.card-title{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.card-title{font-size:0.86rem;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:6px}
 
 /* ── Form ── */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .full{grid-column:1/-1}
 .fgroup{display:flex;flex-direction:column;gap:4px}
-.flabel{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
-input,select,textarea{background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--sans);font-size:13px;width:100%;outline:none;transition:border-color .18s}
+.flabel{font-size:0.72rem;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+input,select,textarea{background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--sans);font-size:0.93rem;width:100%;outline:none;transition:border-color .18s}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 select option{background:var(--card)}
 textarea{resize:vertical;min-height:50px}
-.fuel-hint{font-size:11px;color:var(--green);margin-top:2px;font-family:var(--mono)}
+.fuel-hint{font-size:0.79rem;color:var(--green);margin-top:2px;font-family:var(--mono)}
 
 /* ── Buttons ── */
-.btn{padding:9px 18px;border-radius:7px;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.5px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn{padding:9px 18px;border-radius:7px;border:none;font-family:var(--sans);font-size:0.86rem;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.5px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .btn-primary{background:var(--accent);color:#000}
 .btn-primary:hover{background:#00bbdd}
 .btn-green{background:var(--green);color:#000}
 .btn-green:hover{background:#00cc8e}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
 .btn-ghost:hover{color:var(--text);border-color:var(--dim)}
-.btn-danger{background:transparent;color:var(--red);border:1px solid rgba(255,77,109,.3);padding:5px 10px;font-size:11px}
+.btn-danger{background:transparent;color:var(--red);border:1px solid rgba(255,77,109,.3);padding:5px 10px;font-size:0.79rem}
 .btn-danger:hover{background:var(--red);color:#fff}
-.btn-edit{background:transparent;color:var(--accent);border:1px solid rgba(0,212,255,.3);padding:5px 10px;font-size:11px}
+.btn-edit{background:transparent;color:var(--accent);border:1px solid rgba(0,212,255,.3);padding:5px 10px;font-size:0.79rem}
 .btn-edit:hover{background:var(--accent);color:#000}
-.btn-sm{padding:6px 12px;font-size:11px}
+.btn-sm{padding:6px 12px;font-size:0.79rem}
 
 /* ── Tracking toggle ── */
 .track-card{background:linear-gradient(135deg,rgba(0,212,255,.08),rgba(0,150,200,.04));border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px}
@@ -101,13 +101,13 @@ textarea{resize:vertical;min-height:50px}
 .track-btn.start:hover{background:#00cc8e;box-shadow:0 0 24px rgba(0,229,160,.3)}
 .track-btn.stop{background:rgba(255,77,109,.15);color:var(--red);border:1px solid rgba(255,77,109,.3)}
 .track-btn.stop:hover{background:var(--red);color:#fff}
-.track-time{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--accent);margin:10px 0 4px;letter-spacing:2px}
+.track-time{font-family:var(--mono);font-size:1.57rem;font-weight:500;color:var(--accent);margin:10px 0 4px;letter-spacing:2px}
 
 /* ── Stats ── */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
-.stat-v{font-family:var(--mono);font-size:20px;font-weight:500;margin-bottom:3px}
-.stat-l{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.stat-v{font-family:var(--mono);font-size:1.43rem;font-weight:500;margin-bottom:3px}
+.stat-l{font-size:0.72rem;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
 .c-cyan{color:var(--accent)}
 .c-green{color:var(--green)}
 .c-amber{color:var(--amber)}
@@ -116,31 +116,31 @@ textarea{resize:vertical;min-height:50px}
 /* ── Table ── */
 .tbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .tbar .slabel{margin:0}
-input[type=date]{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:var(--mono)}
+input[type=date]{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:0.86rem;font-family:var(--mono)}
 .twrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 table{width:100%;border-collapse:collapse}
-thead th{background:rgba(0,0,0,.3);padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th{background:rgba(0,0,0,.3);padding:10px 12px;text-align:left;font-size:0.72rem;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
 tbody tr{border-bottom:1px solid rgba(30,45,66,.5);transition:background .15s}
 tbody tr:last-child{border-bottom:none}
 tbody tr:hover{background:rgba(0,212,255,.03)}
-td{padding:10px 12px;font-size:12px;vertical-align:middle}
-.mono{font-family:var(--mono);font-size:11px}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
+.mono{font-family:var(--mono);font-size:0.79rem}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:0.72rem;font-weight:600;white-space:nowrap}
 .bkm{background:rgba(0,212,255,.12);color:var(--accent)}
 .betc{background:rgba(255,176,32,.12);color:var(--amber)}
 .bfuel{background:rgba(0,229,160,.12);color:var(--green)}
 .btotal{background:rgba(255,77,109,.1);color:var(--red)}
-.bkml{background:rgba(179,136,255,.12);color:var(--purple);font-size:9px}
-.bman{font-size:9px;color:var(--dim)}
+.bkml{background:rgba(179,136,255,.12);color:var(--purple);font-size:0.64rem}
+.bman{font-size:0.64rem;color:var(--dim)}
 .tdact{display:flex;gap:5px}
 .empty{text-align:center;padding:52px 20px;color:var(--muted)}
-.empty-i{font-size:40px;margin-bottom:10px;opacity:.3}
+.empty-i{font-size:2.86rem;margin-bottom:10px;opacity:.3}
 
 /* ── ETC panel ── */
 .etc-list{display:flex;flex-direction:column;gap:6px}
 .etc-item{background:rgba(255,176,32,.05);border:1px solid rgba(255,176,32,.15);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
-.etc-amt{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--amber)}
-.etc-info{font-size:11px;color:var(--muted);margin-top:2px}
+.etc-amt{font-family:var(--mono);font-size:1.07rem;font-weight:500;color:var(--amber)}
+.etc-info{font-size:0.79rem;color:var(--muted);margin-top:2px}
 
 /* ── Settings ── */
 .setting-group{margin-bottom:20px}
@@ -166,13 +166,7 @@ td{padding:10px 12px;font-size:12px;vertical-align:middle}
 #toast.err{background:var(--red);color:#fff}
 #toast.warn{background:var(--amber);color:#000}
 
-/* ── Font size levels ── */
-html[data-fs="xs"] { font-size: 11px }
-html[data-fs="sm"] { font-size: 12px }
-html[data-fs="md"] { font-size: 14px }
-html[data-fs="lg"] { font-size: 16px }
-html[data-fs="xl"] { font-size: 18px }
-
+/* ── Font size levels (controlled by JS setting html font-size) ── */
 /* ── Font size picker ── */
 .fs-picker{display:flex;align-items:center;gap:6px;margin-left:12px}
 .fs-label{font-size:10px;color:var(--muted);white-space:nowrap}
@@ -233,9 +227,7 @@ html[data-fs="xl"] { font-size: 18px }
   .full{grid-column:1}
   .fgroup input,.fgroup select,.fgroup textarea{
     padding:10px 12px;
-    font-size:14px; /* 手機上 input 至少 16px 避免 iOS 自動縮放 */
   }
-  input,select,textarea{font-size:16px !important}
 
   /* ── Buttons ── */
   .btn{padding:10px 14px;font-size:13px}
@@ -614,11 +606,14 @@ let scheduleTimer = null;
 let currentTab = 'track';
 
 // ── Font size control ────────────────────────────────────────
+const FS_SCALE = { xs: 0.78, sm: 0.88, md: 1.0, lg: 1.15, xl: 1.32 };
 function setFs(size) {
-  document.documentElement.setAttribute('data-fs', size);
+  const scale = FS_SCALE[size] || 1;
+  document.documentElement.style.fontSize = (14 * scale) + 'px';
   document.querySelectorAll('.fs-btn').forEach(b => b.classList.remove('active'));
-  const map = { xs: 0, sm: 1, md: 2, lg: 3, xl: 4 };
-  document.querySelectorAll('.fs-btn')[map[size]]?.classList.add('active');
+  const keys = Object.keys(FS_SCALE);
+  const idx = keys.indexOf(size);
+  if (idx >= 0) document.querySelectorAll('.fs-btn')[idx]?.classList.add('active');
   localStorage.setItem('fs', size);
 }
 
