@@ -166,27 +166,106 @@ td{padding:10px 12px;font-size:12px;vertical-align:middle}
 #toast.err{background:var(--red);color:#fff}
 #toast.warn{background:var(--amber);color:#000}
 
+/* ── Font size levels ── */
+html[data-fs="xs"] { font-size: 11px }
+html[data-fs="sm"] { font-size: 12px }
+html[data-fs="md"] { font-size: 14px }
+html[data-fs="lg"] { font-size: 16px }
+html[data-fs="xl"] { font-size: 18px }
+
+/* ── Font size picker ── */
+.fs-picker{display:flex;align-items:center;gap:6px;margin-left:12px}
+.fs-label{font-size:10px;color:var(--muted);white-space:nowrap}
+.fs-btn{background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.fs-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.fs-btn:hover:not(.active){color:var(--text);border-color:var(--dim)}
+
 @media(max-width:800px){
-  .layout{grid-template-columns:1fr}
-  .side{position:static;height:auto;max-height:none;border-right:none;border-bottom:1px solid var(--border)}
-  .main{padding:12px}
-  .stats{grid-template-columns:1fr 1fr}
+  /* ── 手機版：全部上下排列 ── */
+  .layout{
+    display:flex;
+    flex-direction:column;
+  }
+  .side{
+    position:static;
+    height:auto;
+    max-height:none;
+    border-right:none;
+    border-bottom:1px solid var(--border);
+    padding:14px;
+    overflow-y:visible;
+  }
+  .main{
+    padding:14px;
+    min-height:auto;
+  }
+
+  /* ── Header ── */
+  header{
+    padding:0 14px;
+    height:auto;
+    min-height:52px;
+    flex-wrap:wrap;
+    gap:6px;
+    padding-top:8px;
+    padding-bottom:8px;
+  }
   .hstats{display:none}
-  header{padding:0 14px;height:52px}
   .logo-sub{display:none}
-  .tabs{padding:0 8px;gap:0}
-  .tab{padding:10px 10px;font-size:10px;letter-spacing:0}
-  .card{padding:12px}
+
+  /* ── 字體大小選擇器在手機上換行 ── */
+  .fs-picker{
+    width:100%;
+    margin-left:0;
+    padding-bottom:4px;
+    justify-content:flex-start;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  /* ── Tabs ── */
+  .tabs{padding:0 6px;gap:0;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 10px;font-size:10px;letter-spacing:0;flex-shrink:0}
+
+  /* ── Cards & forms ── */
+  .card{padding:12px;border-radius:10px}
   .grid2{grid-template-columns:1fr}
   .full{grid-column:1}
-  .track-btn{font-size:14px;padding:13px}
-  .stat{padding:11px 12px}
-  .stat-v{font-size:17px}
-  .twrap{overflow-x:auto}
-  table{min-width:600px}
-  .btn{padding:8px 12px;font-size:12px}
-  .modal{width:95vw;padding:18px}
-  .stats{gap:8px;margin-bottom:12px}
+  .fgroup input,.fgroup select,.fgroup textarea{
+    padding:10px 12px;
+    font-size:14px; /* 手機上 input 至少 16px 避免 iOS 自動縮放 */
+  }
+  input,select,textarea{font-size:16px !important}
+
+  /* ── Buttons ── */
+  .btn{padding:10px 14px;font-size:13px}
+  .btn-sm{padding:8px 12px;font-size:12px}
+  .track-btn{font-size:15px;padding:15px}
+
+  /* ── Stats ── */
+  .stats{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .stat{padding:12px;border-radius:8px}
+  .stat-v{font-size:18px}
+  .stat-l{font-size:9px}
+
+  /* ── Table: 水平滾動 ── */
+  .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px}
+  table{min-width:700px;font-size:12px}
+  thead th{padding:9px 10px;font-size:9px}
+  td{padding:9px 10px}
+
+  /* ── ETC list ── */
+  .etc-amt{font-size:16px}
+
+  /* ── Modal ── */
+  .modal{width:96vw;padding:16px;max-height:92vh}
+  .modal-title{font-size:13px}
+
+  /* ── Toast ── */
+  #toast{right:12px;bottom:16px;font-size:12px;padding:8px 14px}
+
+  /* ── Settings ── */
+  .setting-group{margin-bottom:16px}
 }
 </style>
 </head>
@@ -200,10 +279,20 @@ td{padding:10px 12px;font-size:12px;vertical-align:middle}
       <div class="logo-sub">Trip Tracker Pro</div>
     </div>
   </div>
-  <div class="hstats">
-    <div class="hstat"><div class="hstat-v" id="h-km">— km</div><div class="hstat-l">本月里程</div></div>
-    <div class="hstat"><div class="hstat-v" id="h-etc">$—</div><div class="hstat-l">本月 ETC</div></div>
-    <div class="hstat"><div class="hstat-v" id="h-total">$—</div><div class="hstat-l">本月補貼</div></div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div class="hstats">
+      <div class="hstat"><div class="hstat-v" id="h-km">— km</div><div class="hstat-l">本月里程</div></div>
+      <div class="hstat"><div class="hstat-v" id="h-etc">$—</div><div class="hstat-l">本月 ETC</div></div>
+      <div class="hstat"><div class="hstat-v" id="h-total">$—</div><div class="hstat-l">本月補貼</div></div>
+    </div>
+    <div class="fs-picker">
+      <span class="fs-label">字體：</span>
+      <button class="fs-btn" onclick="setFs('xs')">特小</button>
+      <button class="fs-btn" onclick="setFs('sm')">小</button>
+      <button class="fs-btn active" id="fs-md" onclick="setFs('md')">中</button>
+      <button class="fs-btn" onclick="setFs('lg')">大</button>
+      <button class="fs-btn" onclick="setFs('xl')">特大</button>
+    </div>
   </div>
 </header>
 
@@ -524,8 +613,20 @@ let tracking = false, trackStart = null, trackTimer = null;
 let scheduleTimer = null;
 let currentTab = 'track';
 
+// ── Font size control ────────────────────────────────────────
+function setFs(size) {
+  document.documentElement.setAttribute('data-fs', size);
+  document.querySelectorAll('.fs-btn').forEach(b => b.classList.remove('active'));
+  const map = { xs: 0, sm: 1, md: 2, lg: 3, xl: 4 };
+  document.querySelectorAll('.fs-btn')[map[size]]?.classList.add('active');
+  localStorage.setItem('fs', size);
+}
+
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  // 載入字體大小設定
+  const savedFs = localStorage.getItem('fs') || 'md';
+  setFs(savedFs);
   setDefaultDates();
   document.getElementById('owntracks-url').childNodes[0].textContent = WEBHOOK_URL;
   document.getElementById('webhook-url').textContent = WEBHOOK_URL;
