@@ -316,10 +316,13 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
           <div class="track-dot" id="track-dot"></div>
           <div>
             <div class="track-label" id="track-label">未記錄</div>
-            <div class="track-sub" id="track-sub">按下開始記錄出差行程</div>
+            <div class="track-sub" id="track-sub">按下開始，OwnTracks 切換為高頻模式</div>
           </div>
         </div>
         <div class="track-time" id="track-time" style="display:none">00:00:00</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;font-size:0.72rem">
+          <span style="padding:2px 8px;border-radius:4px;background:rgba(0,229,160,.1);color:var(--green)" id="mode-badge">● Significant（省電）</span>
+        </div>
         <button class="track-btn start" id="track-btn" onclick="toggleTracking()">▶ 開始記錄</button>
       </div>
 
@@ -634,6 +637,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 載入字體大小設定
   const savedFs = localStorage.getItem('fs') || 'md';
   setFs(savedFs);
+  // 恢復追蹤狀態
+  const savedTracking = localStorage.getItem('tracking');
+  if (savedTracking) {
+    try {
+      const t = JSON.parse(savedTracking);
+      tracking = true;
+      trackStart = new Date(t.start);
+      document.getElementById('track-dot').classList.add('active');
+      document.getElementById('track-label').textContent = '記錄中';
+      document.getElementById('track-sub').textContent = 'OwnTracks Move 模式（每100公尺）';
+      document.getElementById('track-time').style.display = '';
+      document.getElementById('track-btn').textContent = '⏹ 停止記錄';
+      document.getElementById('track-btn').className = 'track-btn stop';
+      trackTimer = setInterval(updateTrackTime, 1000);
+    } catch (_) {}
+  }
   setDefaultDates();
   document.getElementById('owntracks-url').childNodes[0].textContent = WEBHOOK_URL;
   document.getElementById('webhook-url').textContent = WEBHOOK_URL;
@@ -720,30 +739,47 @@ function toggleTracking() {
   else stopTracking();
 }
 
-function startTracking() {
+async function setTrackingMode(mode) {
+  // mode 2 = Move（高頻）, mode 1 = Significant Changes（省電）
+  try {
+    await sb.from('settings').update({ tracking_mode: mode }).eq('id', 1);
+  } catch (e) {
+    console.error('tracking mode update failed', e);
+  }
+}
+
+async function startTracking() {
   tracking = true;
   trackStart = new Date();
   document.getElementById('track-dot').classList.add('active');
   document.getElementById('track-label').textContent = '記錄中';
-  document.getElementById('track-sub').textContent = 'OwnTracks 正在追蹤位置';
+  document.getElementById('track-sub').textContent = 'OwnTracks 切換為 Move 模式（每100公尺）';
   document.getElementById('track-time').style.display = '';
   document.getElementById('track-btn').textContent = '⏹ 停止記錄';
   document.getElementById('track-btn').className = 'track-btn stop';
+  document.getElementById('mode-badge').textContent = '● Move（高頻，每100公尺）';
+  document.getElementById('mode-badge').style.background = 'rgba(0,212,255,.1)';
+  document.getElementById('mode-badge').style.color = 'var(--accent)';
   trackTimer = setInterval(updateTrackTime, 1000);
-  toast('開始記錄行程');
+  await setTrackingMode(2);
+  toast('開始記錄！OwnTracks 已切換為高頻模式');
   localStorage.setItem('tracking', JSON.stringify({ start: trackStart.toISOString() }));
 }
 
-function stopTracking() {
+async function stopTracking() {
   tracking = false;
   clearInterval(trackTimer);
   document.getElementById('track-dot').classList.remove('active');
   document.getElementById('track-label').textContent = '已停止';
-  document.getElementById('track-sub').textContent = '行程記錄已結束';
+  document.getElementById('track-sub').textContent = 'OwnTracks 切換回省電模式';
   document.getElementById('track-time').style.display = 'none';
   document.getElementById('track-btn').textContent = '▶ 開始記錄';
   document.getElementById('track-btn').className = 'track-btn start';
-  toast('記錄已停止');
+  document.getElementById('mode-badge').textContent = '● Significant（省電）';
+  document.getElementById('mode-badge').style.background = 'rgba(0,229,160,.1)';
+  document.getElementById('mode-badge').style.color = 'var(--green)';
+  await setTrackingMode(1);
+  toast('記錄已停止，OwnTracks 切換回省電模式');
   localStorage.removeItem('tracking');
 }
 
