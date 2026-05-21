@@ -206,16 +206,8 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
   }
   .hstats{display:none}
   .logo-sub{display:none}
-
-  /* ── 字體大小選擇器在手機上換行 ── */
-  .fs-picker{
-    width:100%;
-    margin-left:0;
-    padding-bottom:4px;
-    justify-content:flex-start;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-  }
+  /* ── 手機版字體選擇器隱藏在 header，移到設定頁 ── */
+  .fs-picker{ display:none }
 
   /* ── Tabs ── */
   .tabs{padding:0 6px;gap:0;-webkit-overflow-scrolling:touch}
@@ -279,11 +271,11 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
     </div>
     <div class="fs-picker">
       <span class="fs-label">字體：</span>
-      <button class="fs-btn" onclick="setFs('xs')">特小</button>
-      <button class="fs-btn" onclick="setFs('sm')">小</button>
-      <button class="fs-btn active" id="fs-md" onclick="setFs('md')">中</button>
-      <button class="fs-btn" onclick="setFs('lg')">大</button>
-      <button class="fs-btn" onclick="setFs('xl')">特大</button>
+      <button class="fs-btn" data-fs="xs" onclick="setFs('xs')">特小</button>
+      <button class="fs-btn" data-fs="sm" onclick="setFs('sm')">小</button>
+      <button class="fs-btn active" data-fs="md" onclick="setFs('md')">中</button>
+      <button class="fs-btn" data-fs="lg" onclick="setFs('lg')">大</button>
+      <button class="fs-btn" data-fs="xl" onclick="setFs('xl')">特大</button>
     </div>
   </div>
 </header>
@@ -506,6 +498,20 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
     <!-- Settings main -->
     <div id="main-settings" style="display:none">
       <div style="max-width:520px">
+
+        <!-- 字體大小設定（手機版主要入口） -->
+        <div class="setting-group">
+          <div class="setting-title">字體大小</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <button class="fs-btn" data-fs="xs" onclick="setFs('xs')" style="padding:8px 16px;font-size:0.86rem">特小</button>
+            <button class="fs-btn" data-fs="sm" onclick="setFs('sm')" style="padding:8px 16px;font-size:0.93rem">小</button>
+            <button class="fs-btn active" data-fs="md" onclick="setFs('md')" style="padding:8px 16px;font-size:1rem">中（預設）</button>
+            <button class="fs-btn" data-fs="lg" onclick="setFs('lg')" style="padding:8px 16px;font-size:1.07rem">大</button>
+            <button class="fs-btn" data-fs="xl" onclick="setFs('xl')" style="padding:8px 16px;font-size:1.14rem">特大</button>
+          </div>
+          <div style="font-size:0.79rem;color:var(--muted);margin-top:8px">設定後自動記憶，下次開啟維持相同大小</div>
+        </div>
+
         <div class="setting-group">
           <div class="setting-title">公司資訊</div>
           <div class="grid2">
@@ -610,10 +616,11 @@ const FS_SCALE = { xs: 0.78, sm: 0.88, md: 1.0, lg: 1.15, xl: 1.32 };
 function setFs(size) {
   const scale = FS_SCALE[size] || 1;
   document.documentElement.style.fontSize = (14 * scale) + 'px';
-  document.querySelectorAll('.fs-btn').forEach(b => b.classList.remove('active'));
-  const keys = Object.keys(FS_SCALE);
-  const idx = keys.indexOf(size);
-  if (idx >= 0) document.querySelectorAll('.fs-btn')[idx]?.classList.add('active');
+  // Update all fs-btn active state (header + settings page)
+  document.querySelectorAll('.fs-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.dataset.fs === size) b.classList.add('active');
+  });
   localStorage.setItem('fs', size);
 }
 
