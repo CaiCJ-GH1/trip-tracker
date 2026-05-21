@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出差行車記錄</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg:       #080c12;
+  --surface:  #0e1520;
+  --card:     #131d2e;
+  --border:   #1e2d42;
+  --border2:  #253347;
+  --accent:   #00d4ff;
+  --accent2:  #0099cc;
+  --green:    #00e5a0;
+  --amber:    #ffb020;
+  --red:      #ff4d6d;
+  --purple:   #b388ff;
+  --text:     #dce8f5;
+  --muted:    #5a7a9a;
+  --dim:      #3a5570;
+  --mono:     'DM Mono', monospace;
+  --sans:     'Sora', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;overflow-x:hidden}
+
+/* ── Background grid ── */
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+/* ── Header ── */
+header{position:sticky;top:0;z-index:100;background:rgba(8,12,18,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#006699);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 20px rgba(0,212,255,.3)}
+.logo-text{font-size:15px;font-weight:700;letter-spacing:.3px;color:var(--text)}
+.logo-sub{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+.hstats{display:flex;gap:20px}
+.hstat{text-align:right}
+.hstat-v{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--accent)}
+.hstat-l{font-size:10px;color:var(--muted);margin-top:1px;letter-spacing:.5px}
+
+/* ── Tab ── */
+.tabs{display:flex;gap:2px;padding:0 24px;background:rgba(8,12,18,.6);border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:11px 20px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:340px 1fr;position:relative;z-index:1}
+.side{border-right:1px solid var(--border);background:var(--surface);padding:20px;display:flex;flex-direction:column;gap:16px;position:sticky;top:96px;height:calc(100vh - 96px);overflow-y:auto}
+.side-panel{display:none}
+.side-panel.on{display:flex;flex-direction:column;gap:16px}
+.main{padding:20px;min-height:calc(100vh - 96px)}
+
+/* ── Section labels ── */
+.slabel{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card-title{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+
+/* ── Form ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+.fgroup{display:flex;flex-direction:column;gap:4px}
+.flabel{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+input,select,textarea{background:rgba(0,0,0,.4);border:1px solid var(--border2);border-radius:7px;padding:8px 10px;color:var(--text);font-family:var(--sans);font-size:13px;width:100%;outline:none;transition:border-color .18s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--card)}
+textarea{resize:vertical;min-height:50px}
+.fuel-hint{font-size:11px;color:var(--green);margin-top:2px;font-family:var(--mono)}
+
+/* ── Buttons ── */
+.btn{padding:9px 18px;border-radius:7px;border:none;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.5px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#00bbdd}
+.btn-green{background:var(--green);color:#000}
+.btn-green:hover{background:#00cc8e}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--dim)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid rgba(255,77,109,.3);padding:5px 10px;font-size:11px}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-edit{background:transparent;color:var(--accent);border:1px solid rgba(0,212,255,.3);padding:5px 10px;font-size:11px}
+.btn-edit:hover{background:var(--accent);color:#000}
+.btn-sm{padding:6px 12px;font-size:11px}
+
+/* ── Tracking toggle ── */
+.track-card{background:linear-gradient(135deg,rgba(0,212,255,.08),rgba(0,150,200,.04));border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px}
+.track-status{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.track-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:all .3s}
+.track-dot.active{background:var(--green);box-shadow:0 0 12px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.track-label{font-size:13px;font-weight:600}
+.track-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.track-btn{width:100%;padding:11px;font-size:13px;font-weight:700;letter-spacing:1px;border-radius:8px;border:none;cursor:pointer;transition:all .25s}
+.track-btn.start{background:var(--green);color:#000}
+.track-btn.start:hover{background:#00cc8e;box-shadow:0 0 24px rgba(0,229,160,.3)}
+.track-btn.stop{background:rgba(255,77,109,.15);color:var(--red);border:1px solid rgba(255,77,109,.3)}
+.track-btn.stop:hover{background:var(--red);color:#fff}
+.track-time{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--accent);margin:10px 0 4px;letter-spacing:2px}
+
+/* ── Stats ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.stat-v{font-family:var(--mono);font-size:20px;font-weight:500;margin-bottom:3px}
+.stat-l{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.c-cyan{color:var(--accent)}
+.c-green{color:var(--green)}
+.c-amber{color:var(--amber)}
+.c-red{color:var(--red)}
+
+/* ── Table ── */
+.tbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tbar .slabel{margin:0}
+input[type=date]{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;font-family:var(--mono)}
+.twrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{background:rgba(0,0,0,.3);padding:10px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid rgba(30,45,66,.5);transition:background .15s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(0,212,255,.03)}
+td{padding:10px 12px;font-size:12px;vertical-align:middle}
+.mono{font-family:var(--mono);font-size:11px}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.bkm{background:rgba(0,212,255,.12);color:var(--accent)}
+.betc{background:rgba(255,176,32,.12);color:var(--amber)}
+.bfuel{background:rgba(0,229,160,.12);color:var(--green)}
+.btotal{background:rgba(255,77,109,.1);color:var(--red)}
+.bkml{background:rgba(179,136,255,.12);color:var(--purple);font-size:9px}
+.bman{font-size:9px;color:var(--dim)}
+.tdact{display:flex;gap:5px}
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty-i{font-size:40px;margin-bottom:10px;opacity:.3}
+
+/* ── ETC panel ── */
+.etc-list{display:flex;flex-direction:column;gap:6px}
+.etc-item{background:rgba(255,176,32,.05);border:1px solid rgba(255,176,32,.15);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.etc-amt{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--amber)}
+.etc-info{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── Settings ── */
+.setting-group{margin-bottom:20px}
+.setting-title{font-size:11px;font-weight:600;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* ── Modal ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.overlay.on{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;width:480px;max-width:92vw;max-height:88vh;overflow-y:auto}
+.modal-title{font-size:14px;font-weight:700;color:var(--accent);margin-bottom:16px;letter-spacing:.5px}
+
+/* ── OwnTracks setup ── */
+.setup-step{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px}
+.step-num{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:500;margin-bottom:4px;letter-spacing:1px}
+.step-text{font-size:12px;color:var(--text);line-height:1.6}
+.code-block{background:rgba(0,0,0,.5);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--green);margin-top:6px;word-break:break-all;position:relative}
+.copy-btn{position:absolute;top:6px;right:6px;background:rgba(0,212,255,.15);border:none;color:var(--accent);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:var(--sans)}
+.copy-btn:hover{background:rgba(0,212,255,.3)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:999;font-family:var(--sans)}
+#toast.on{opacity:1}
+#toast.err{background:var(--red);color:#fff}
+#toast.warn{background:var(--amber);color:#000}
+
+@media(max-width:800px){
+  .layout{grid-template-columns:1fr}
+  .side{position:static;height:auto}
+  .stats{grid-template-columns:1fr 1fr}
+  .hstats{display:none}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">🚗</div>
+    <div>
+      <div class="logo-text">出差行車記錄</div>
+      <div class="logo-sub">Trip Tracker Pro</div>
+    </div>
+  </div>
+  <div class="hstats">
+    <div class="hstat"><div class="hstat-v" id="h-km">— km</div><div class="hstat-l">本月里程</div></div>
+    <div class="hstat"><div class="hstat-v" id="h-etc">$—</div><div class="hstat-l">本月 ETC</div></div>
+    <div class="hstat"><div class="hstat-v" id="h-total">$—</div><div class="hstat-l">本月補貼</div></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab on" onclick="gotoTab('track')">🔴 追蹤控制</div>
+  <div class="tab" onclick="gotoTab('trips')">📋 行程記錄</div>
+  <div class="tab" onclick="gotoTab('etc')">🛣 ETC 費用</div>
+  <div class="tab" onclick="gotoTab('settings')">⚙️ 設定</div>
+  <div class="tab" onclick="gotoTab('export')">⬇ 匯出</div>
+</div>
+
+<div class="layout">
+  <!-- ══ SIDE ══ -->
+  <aside class="side">
+
+    <!-- 追蹤控制 side -->
+    <div class="side-panel on" id="sp-track">
+      <!-- Tracking toggle -->
+      <div class="track-card">
+        <div class="track-status">
+          <div class="track-dot" id="track-dot"></div>
+          <div>
+            <div class="track-label" id="track-label">未記錄</div>
+            <div class="track-sub" id="track-sub">按下開始記錄出差行程</div>
+          </div>
+        </div>
+        <div class="track-time" id="track-time" style="display:none">00:00:00</div>
+        <button class="track-btn start" id="track-btn" onclick="toggleTracking()">▶ 開始記錄</button>
+      </div>
+
+      <!-- 預約啟動 -->
+      <div class="card">
+        <div class="card-title">⏰ 預約啟動</div>
+        <div class="grid2">
+          <div class="fgroup full">
+            <div class="flabel">預約時間</div>
+            <input type="time" id="sched-time">
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="setSchedule()">設定預約</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSchedule()">取消</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px" id="sched-label"></div>
+      </div>
+
+      <!-- 手動新增 -->
+      <div class="card">
+        <div class="card-title">✏️ 手動新增行程</div>
+        <div class="grid2">
+          <div class="fgroup"><div class="flabel">日期</div><input type="date" id="f-date"></div>
+          <div class="fgroup"><div class="flabel">油資(元/km)</div><input type="number" id="f-rate" value="4" step="0.5" min="1"></div>
+          <div class="fgroup"><div class="flabel">抵達時間</div><input type="time" id="f-arrive"></div>
+          <div class="fgroup"><div class="flabel">離開時間</div><input type="time" id="f-leave"></div>
+          <div class="fgroup full"><div class="flabel">出發地</div><input type="text" id="f-origin" placeholder="例：台北市信義區市府路1號"></div>
+          <div class="fgroup full"><div class="flabel">目的地</div><input type="text" id="f-dest" placeholder="例：新竹市東區光復路101號"></div>
+          <div class="fgroup"><div class="flabel">距離 (km)</div><input type="number" id="f-km" step="0.1" min="0" placeholder="0.0" oninput="calcFuel()"></div>
+          <div class="fgroup"><div class="flabel">ETC (元)</div><input type="number" id="f-etc-amt" value="0" min="0" step="10"></div>
+          <div class="fgroup full"><div class="flabel">出差事由</div><input type="text" id="f-purpose" placeholder="客戶拜訪 / 廠商會議"></div>
+          <div class="fgroup full"><div class="flabel">備註</div><textarea id="f-note" rows="2" placeholder="其他說明..."></textarea></div>
+        </div>
+        <div class="fuel-hint" id="fuel-hint">油資補貼：—</div>
+        <div style="margin-top:10px">
+          <button class="btn btn-primary" style="width:100%" onclick="addTrip()">＋ 新增行程</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 行程記錄 side -->
+    <div class="side-panel" id="sp-trips">
+      <div class="card">
+        <div class="card-title">🔍 篩選</div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">開始日期</div>
+          <input type="date" id="filter-from" onchange="loadTrips()">
+        </div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">結束日期</div>
+          <input type="date" id="filter-to" onchange="loadTrips()">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="setThisMonth()">本月</button>
+          <button class="btn btn-ghost btn-sm" onclick="setLastMonth()">上月</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearFilter()">全部</button>
+        </div>
+      </div>
+      <!-- OwnTracks 設定說明 -->
+      <div class="card">
+        <div class="card-title">📱 OwnTracks 設定</div>
+        <div class="setup-step">
+          <div class="step-num">STEP 01</div>
+          <div class="step-text">下載 OwnTracks App<br>Android / iOS 皆可</div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">STEP 02</div>
+          <div class="step-text">設定 → 連線 → HTTP 模式<br>貼上以下網址：</div>
+          <div class="code-block" id="owntracks-url">載入中...<button class="copy-btn" onclick="copyUrl()">複製</button></div>
+        </div>
+        <div class="setup-step">
+          <div class="step-num">STEP 03</div>
+          <div class="step-text">裝置 ID：填你的名字<br>追蹤模式：移動（每100公尺）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETC side -->
+    <div class="side-panel" id="sp-etc">
+      <div class="card">
+        <div class="card-title">➕ 新增 ETC 費用</div>
+        <div class="grid2">
+          <div class="fgroup"><div class="flabel">通行日期</div><input type="date" id="etc-date"></div>
+          <div class="fgroup"><div class="flabel">金額 (元)</div><input type="number" id="etc-amt" min="0" step="5" placeholder="0"></div>
+          <div class="fgroup"><div class="flabel">通行時間</div><input type="time" id="etc-time"></div>
+          <div class="fgroup"><div class="flabel">收費站/路段</div><input type="text" id="etc-highway" placeholder="國道1號"></div>
+          <div class="fgroup full"><div class="flabel">備註</div><input type="text" id="etc-note" placeholder="自動由 MacroDroid 填入或手動輸入"></div>
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn btn-primary" style="width:100%" onclick="addEtc()">＋ 新增 ETC</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings side -->
+    <div class="side-panel" id="sp-settings">
+      <div class="card">
+        <div class="card-title">💾 儲存設定</div>
+        <button class="btn btn-green" style="width:100%" onclick="saveSettings()">✓ 儲存所有設定</button>
+      </div>
+    </div>
+
+    <!-- Export side -->
+    <div class="side-panel" id="sp-export">
+      <div class="card">
+        <div class="card-title">📅 選擇日期範圍</div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">開始日期</div>
+          <input type="date" id="exp-from">
+        </div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">結束日期</div>
+          <input type="date" id="exp-to">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn btn-ghost btn-sm" onclick="expThisMonth()">本月</button>
+          <button class="btn btn-ghost btn-sm" onclick="expLastMonth()">上月</button>
+        </div>
+        <button class="btn btn-green" style="width:100%" onclick="exportExcel()">⬇ 匯出 Excel</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <main class="main">
+
+    <!-- 追蹤控制 main -->
+    <div id="main-track">
+      <div class="stats">
+        <div class="stat"><div class="stat-v c-cyan" id="s-count">0</div><div class="stat-l">本月次數</div></div>
+        <div class="stat"><div class="stat-v c-green" id="s-km">0.0</div><div class="stat-l">本月里程 km</div></div>
+        <div class="stat"><div class="stat-v c-amber" id="s-etc">$0</div><div class="stat-l">本月 ETC</div></div>
+        <div class="stat"><div class="stat-v c-red" id="s-total">$0</div><div class="stat-l">本月補貼合計</div></div>
+      </div>
+      <!-- 最近行程 -->
+      <div class="slabel">最近行程</div>
+      <div class="twrap">
+        <table>
+          <thead><tr><th>日期</th><th>出發地</th><th>目的地</th><th>里程</th><th>補貼</th><th>事由</th></tr></thead>
+          <tbody id="recent-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 行程記錄 main -->
+    <div id="main-trips" style="display:none">
+      <div class="tbar">
+        <div class="slabel">行程明細</div>
+        <div style="flex:1"></div>
+        <div id="trip-count" style="font-size:11px;color:var(--muted)"></div>
+      </div>
+      <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat"><div class="stat-v c-green" id="ts-km">0.0</div><div class="stat-l">總里程 km</div></div>
+        <div class="stat"><div class="stat-v c-amber" id="ts-etc">$0</div><div class="stat-l">ETC 合計</div></div>
+        <div class="stat"><div class="stat-v c-red" id="ts-total">$0</div><div class="stat-l">補貼合計</div></div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr><th>#</th><th>日期</th><th>抵達</th><th>離開</th><th>出發地</th><th>目的地</th><th>里程</th><th>ETC</th><th>油資</th><th>合計</th><th>來源</th><th>事由</th><th>操作</th></tr></thead>
+          <tbody id="trips-body"></tbody>
+        </table>
+        <div class="empty" id="trips-empty" style="display:none"><div class="empty-i">🗺</div><div>此期間沒有行程記錄</div></div>
+      </div>
+    </div>
+
+    <!-- ETC main -->
+    <div id="main-etc" style="display:none">
+      <div class="tbar">
+        <div class="slabel">ETC 費用記錄</div>
+        <div style="flex:1"></div>
+        <div id="etc-count" style="font-size:11px;color:var(--muted)"></div>
+      </div>
+      <div class="etc-list" id="etc-list">
+        <div class="empty"><div class="empty-i">🛣</div><div>尚無 ETC 記錄</div></div>
+      </div>
+    </div>
+
+    <!-- Settings main -->
+    <div id="main-settings" style="display:none">
+      <div style="max-width:520px">
+        <div class="setting-group">
+          <div class="setting-title">公司資訊</div>
+          <div class="grid2">
+            <div class="fgroup full"><div class="flabel">公司名稱</div><input type="text" id="s-company" placeholder="我的公司"></div>
+            <div class="fgroup full"><div class="flabel">公司地址</div><input type="text" id="s-address" placeholder="台北市信義區市府路1號"></div>
+            <div class="fgroup"><div class="flabel">公司緯度</div><input type="number" id="s-lat" placeholder="25.0330" step="0.0001"></div>
+            <div class="fgroup"><div class="flabel">公司經度</div><input type="number" id="s-lng" placeholder="121.5654" step="0.0001"></div>
+            <div class="fgroup full"><div class="flabel">自動標記半徑 (公尺)</div><input type="number" id="s-radius" placeholder="500" value="500"></div>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">津貼設定</div>
+          <div class="grid2">
+            <div class="fgroup"><div class="flabel">里程費率 (元/km)</div><input type="number" id="s-rate" value="4" step="0.5" min="1"></div>
+            <div class="fgroup"><div class="flabel">ETC 單次上限 (元，0=無限制)</div><input type="number" id="s-etclimit" value="0" min="0" step="50"></div>
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">上傳模式</div>
+          <div class="fgroup">
+            <select id="s-upload">
+              <option value="wifi">WiFi 優先（預設，省流量）</option>
+              <option value="always">行動網路即時上傳</option>
+            </select>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
+            WiFi 模式：OwnTracks 僅在連上 WiFi 時批次上傳暫存座標<br>
+            即時模式：每 100 公尺立即上傳，耗較多行動數據
+          </div>
+        </div>
+        <div class="setting-group">
+          <div class="setting-title">OwnTracks Webhook 網址</div>
+          <div class="code-block" id="webhook-url" style="font-size:12px">載入中...</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">複製此網址貼到 OwnTracks App 的 HTTP 端點設定</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export main -->
+    <div id="main-export" style="display:none">
+      <div class="slabel" style="margin-bottom:14px">匯出預覽</div>
+      <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+        <div class="stat"><div class="stat-v c-cyan" id="exp-count">—</div><div class="stat-l">出差次數</div></div>
+        <div class="stat"><div class="stat-v c-green" id="exp-km">—</div><div class="stat-l">總里程 km</div></div>
+        <div class="stat"><div class="stat-v c-red" id="exp-total">—</div><div class="stat-l">補貼合計</div></div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr><th>#</th><th>日期</th><th>出發地</th><th>目的地</th><th>距離</th><th>ETC</th><th>油資</th><th>合計</th><th>事由</th></tr></thead>
+          <tbody id="exp-body"></tbody>
+        </table>
+        <div class="empty" id="exp-empty" style="display:none"><div class="empty-i">📊</div><div>選擇日期範圍後點擊匯出</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Edit Modal -->
+<div class="overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">✏️ 編輯行程</div>
+    <input type="hidden" id="edit-id">
+    <div class="grid2">
+      <div class="fgroup"><div class="flabel">日期</div><input type="date" id="e-date"></div>
+      <div class="fgroup"><div class="flabel">油資(元/km)</div><input type="number" id="e-rate" step="0.5"></div>
+      <div class="fgroup"><div class="flabel">抵達時間</div><input type="time" id="e-arrive"></div>
+      <div class="fgroup"><div class="flabel">離開時間</div><input type="time" id="e-leave"></div>
+      <div class="fgroup full"><div class="flabel">出發地</div><input type="text" id="e-origin"></div>
+      <div class="fgroup full"><div class="flabel">目的地</div><input type="text" id="e-dest"></div>
+      <div class="fgroup"><div class="flabel">距離 (km)</div><input type="number" id="e-km" step="0.1"></div>
+      <div class="fgroup"><div class="flabel">ETC (元)</div><input type="number" id="e-etc" step="10"></div>
+      <div class="fgroup full"><div class="flabel">出差事由</div><input type="text" id="e-purpose"></div>
+      <div class="fgroup full"><div class="flabel">備註</div><textarea id="e-note" rows="2"></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Supabase init ────────────────────────────────────────────
+const SUPABASE_URL = 'https://bntqvijwmvdadnttucol.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_5fw-iR6LVdbzhlUyePyjNw_Q54uH-rs';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// OwnTracks webhook endpoint (Supabase Edge Function URL)
+const WEBHOOK_URL = `${SUPABASE_URL}/functions/v1/owntracks`;
+
+// ── State ────────────────────────────────────────────────────
+let allTrips = [], allEtc = [], settings = {};
+let tracking = false, trackStart = null, trackTimer = null;
+let scheduleTimer = null;
+let currentTab = 'track';
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  setDefaultDates();
+  document.getElementById('owntracks-url').childNodes[0].textContent = WEBHOOK_URL;
+  document.getElementById('webhook-url').textContent = WEBHOOK_URL;
+  await loadSettings();
+  await loadTrips();
+  await loadEtc();
+  updateHeaderStats();
+});
+
+function setDefaultDates() {
+  const today = new Date().toISOString().slice(0, 10);
+  const firstDay = today.slice(0, 8) + '01';
+  document.getElementById('f-date').value = today;
+  document.getElementById('etc-date').value = today;
+  document.getElementById('filter-from').value = firstDay;
+  document.getElementById('filter-to').value = today;
+  document.getElementById('exp-from').value = firstDay;
+  document.getElementById('exp-to').value = today;
+}
+
+// ── Tab navigation ───────────────────────────────────────────
+function gotoTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const tabs = ['track','trips','etc','settings','export'];
+    t.classList.toggle('on', tabs[i] === tab);
+  });
+  ['track','trips','etc','settings','export'].forEach(t => {
+    document.getElementById(`sp-${t}`).classList.toggle('on', t === tab);
+    document.getElementById(`main-${t}`).style.display = t === tab ? '' : 'none';
+  });
+  if (tab === 'trips') loadTrips();
+  if (tab === 'etc') loadEtc();
+  if (tab === 'export') previewExport();
+}
+
+// ── Tracking control ─────────────────────────────────────────
+function toggleTracking() {
+  if (!tracking) startTracking();
+  else stopTracking();
+}
+
+function startTracking() {
+  tracking = true;
+  trackStart = new Date();
+  document.getElementById('track-dot').classList.add('active');
+  document.getElementById('track-label').textContent = '記錄中';
+  document.getElementById('track-sub').textContent = 'OwnTracks 正在追蹤位置';
+  document.getElementById('track-time').style.display = '';
+  document.getElementById('track-btn').textContent = '⏹ 停止記錄';
+  document.getElementById('track-btn').className = 'track-btn stop';
+  trackTimer = setInterval(updateTrackTime, 1000);
+  toast('開始記錄行程');
+  localStorage.setItem('tracking', JSON.stringify({ start: trackStart.toISOString() }));
+}
+
+function stopTracking() {
+  tracking = false;
+  clearInterval(trackTimer);
+  document.getElementById('track-dot').classList.remove('active');
+  document.getElementById('track-label').textContent = '已停止';
+  document.getElementById('track-sub').textContent = '行程記錄已結束';
+  document.getElementById('track-time').style.display = 'none';
+  document.getElementById('track-btn').textContent = '▶ 開始記錄';
+  document.getElementById('track-btn').className = 'track-btn start';
+  toast('記錄已停止');
+  localStorage.removeItem('tracking');
+}
+
+function updateTrackTime() {
+  if (!trackStart) return;
+  const s = Math.floor((Date.now() - trackStart) / 1000);
+  const h = String(Math.floor(s / 3600)).padStart(2, '0');
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const sec = String(s % 60).padStart(2, '0');
+  document.getElementById('track-time').textContent = `${h}:${m}:${sec}`;
+}
+
+// ── Schedule ─────────────────────────────────────────────────
+function setSchedule() {
+  const t = document.getElementById('sched-time').value;
+  if (!t) { toast('請設定時間', 'warn'); return; }
+  clearSchedule();
+  const [h, m] = t.split(':').map(Number);
+  const now = new Date();
+  const target = new Date();
+  target.setHours(h, m, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const ms = target - now;
+  scheduleTimer = setTimeout(() => { startTracking(); }, ms);
+  document.getElementById('sched-label').textContent = `預約於 ${t} 自動啟動（${Math.round(ms/60000)} 分鐘後）`;
+  toast(`已預約 ${t} 啟動`);
+}
+
+function clearSchedule() {
+  clearTimeout(scheduleTimer);
+  document.getElementById('sched-label').textContent = '';
+}
+
+// ── Settings ─────────────────────────────────────────────────
+async function loadSettings() {
+  const { data } = await sb.from('settings').select('*').eq('id', 1).single();
+  if (!data) return;
+  settings = data;
+  document.getElementById('s-company').value = data.company_name || '';
+  document.getElementById('s-address').value = data.company_address || '';
+  document.getElementById('s-lat').value = data.company_lat || '';
+  document.getElementById('s-lng').value = data.company_lng || '';
+  document.getElementById('s-radius').value = data.company_radius || 500;
+  document.getElementById('s-rate').value = data.fuel_rate || 4;
+  document.getElementById('s-etclimit').value = data.etc_limit || 0;
+  document.getElementById('s-upload').value = data.upload_mode || 'wifi';
+  document.getElementById('f-rate').value = data.fuel_rate || 4;
+}
+
+async function saveSettings() {
+  const d = {
+    company_name: document.getElementById('s-company').value,
+    company_address: document.getElementById('s-address').value,
+    company_lat: parseFloat(document.getElementById('s-lat').value) || null,
+    company_lng: parseFloat(document.getElementById('s-lng').value) || null,
+    company_radius: parseInt(document.getElementById('s-radius').value) || 500,
+    fuel_rate: parseFloat(document.getElementById('s-rate').value) || 4,
+    etc_limit: parseInt(document.getElementById('s-etclimit').value) || 0,
+    upload_mode: document.getElementById('s-upload').value,
+    updated_at: new Date().toISOString(),
+  };
+  await sb.from('settings').update(d).eq('id', 1);
+  settings = { ...settings, ...d };
+  document.getElementById('f-rate').value = d.fuel_rate;
+  toast('設定已儲存');
+}
+
+// ── Trips ────────────────────────────────────────────────────
+async function loadTrips() {
+  const from = document.getElementById('filter-from')?.value;
+  const to = document.getElementById('filter-to')?.value;
+  let q = sb.from('trips').select('*').order('date', { ascending: false }).order('arrive_time', { ascending: false });
+  if (from) q = q.gte('date', from);
+  if (to) q = q.lte('date', to);
+  const { data } = await q;
+  allTrips = data || [];
+  renderTrips();
+  updateStats();
+  updateHeaderStats();
+}
+
+function renderTrips() {
+  // Recent (home tab)
+  const recBody = document.getElementById('recent-body');
+  const recent = allTrips.slice(0, 8);
+  recBody.innerHTML = recent.length ? recent.map(t => {
+    const fuel = Math.round(t.distance_km * t.fuel_rate);
+    return `<tr>
+      <td class="mono">${t.date}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.origin}">${t.origin}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.destination}">${t.destination}</td>
+      <td><span class="badge bkm">${t.distance_km} km</span></td>
+      <td><span class="badge btotal">$${fmt(fuel)}</span></td>
+      <td style="font-size:11px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.purpose||'—'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">尚無行程記錄</td></tr>';
+
+  // Trips tab
+  const tbody = document.getElementById('trips-body');
+  const empty = document.getElementById('trips-empty');
+  if (!allTrips.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = allTrips.map((t, i) => {
+    const fuel = Math.round(t.distance_km * t.fuel_rate);
+    const total = (t.etc_fee || 0) + fuel;
+    const src = t.source === 'owntracks' ? '<span class="badge bkml">OT</span>'
+              : t.source === 'kml' ? '<span class="badge bkml">KML</span>'
+              : '<span class="bman">手動</span>';
+    return `<tr>
+      <td class="mono" style="color:var(--muted)">${allTrips.length - i}</td>
+      <td class="mono">${t.date}</td>
+      <td class="mono" style="color:var(--muted)">${t.arrive_time||'—'}</td>
+      <td class="mono" style="color:var(--muted)">${t.leave_time||'—'}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.origin}">${t.origin}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.destination}">${t.destination}</td>
+      <td><span class="badge bkm">${t.distance_km} km</span></td>
+      <td><span class="badge betc">${(t.etc_fee||0)>0?'$'+fmt(t.etc_fee||0):'—'}</span></td>
+      <td><span class="badge bfuel">$${fmt(fuel)}</span></td>
+      <td><span class="badge btotal">$${fmt(total)}</span></td>
+      <td>${src}</td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)">${t.purpose||'—'}</td>
+      <td><div class="tdact">
+        <button class="btn btn-edit" onclick="openEdit(${t.id})">編輯</button>
+        <button class="btn btn-danger" onclick="delTrip(${t.id})">刪</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('trip-count').textContent = `共 ${allTrips.length} 筆`;
+}
+
+function updateStats() {
+  const km  = allTrips.reduce((a, t) => a + (t.distance_km || 0), 0);
+  const etc = allTrips.reduce((a, t) => a + (t.etc_fee || 0), 0);
+  const fuel= allTrips.reduce((a, t) => a + Math.round((t.distance_km||0) * (t.fuel_rate||4)), 0);
+  document.getElementById('ts-km').textContent = km.toFixed(1);
+  document.getElementById('ts-etc').textContent = '$' + fmt(etc);
+  document.getElementById('ts-total').textContent = '$' + fmt(etc + fuel);
+}
+
+function updateHeaderStats() {
+  const m = new Date().toISOString().slice(0, 7);
+  const tm = allTrips.filter(t => t.date?.startsWith(m));
+  const km  = tm.reduce((a, t) => a + (t.distance_km || 0), 0);
+  const etc = tm.reduce((a, t) => a + (t.etc_fee || 0), 0);
+  const fuel= tm.reduce((a, t) => a + Math.round((t.distance_km||0) * (t.fuel_rate||4)), 0);
+  document.getElementById('h-km').textContent = km.toFixed(1) + ' km';
+  document.getElementById('h-etc').textContent = '$' + fmt(etc);
+  document.getElementById('h-total').textContent = '$' + fmt(etc + fuel);
+  document.getElementById('s-count').textContent = tm.length;
+  document.getElementById('s-km').textContent = km.toFixed(1);
+  document.getElementById('s-etc').textContent = '$' + fmt(etc);
+  document.getElementById('s-total').textContent = '$' + fmt(etc + fuel);
+}
+
+// ── Add trip ─────────────────────────────────────────────────
+function calcFuel() {
+  const km = parseFloat(document.getElementById('f-km').value) || 0;
+  const rate = parseFloat(document.getElementById('f-rate').value) || 4;
+  document.getElementById('fuel-hint').textContent = km > 0
+    ? `油資補貼：${fmt(Math.round(km * rate))} 元（${km} km × ${rate} 元）`
+    : '油資補貼：—';
+}
+
+async function addTrip() {
+  const d = {
+    date: document.getElementById('f-date').value,
+    arrive_time: document.getElementById('f-arrive').value || null,
+    leave_time: document.getElementById('f-leave').value || null,
+    origin: document.getElementById('f-origin').value.trim(),
+    destination: document.getElementById('f-dest').value.trim(),
+    distance_km: parseFloat(document.getElementById('f-km').value) || 0,
+    etc_fee: parseInt(document.getElementById('f-etc-amt').value) || 0,
+    fuel_rate: parseFloat(document.getElementById('f-rate').value) || 4,
+    fuel_subsidy: 0,
+    purpose: document.getElementById('f-purpose').value.trim(),
+    note: document.getElementById('f-note').value.trim(),
+    source: 'manual',
+  };
+  d.fuel_subsidy = Math.round(d.distance_km * d.fuel_rate);
+  if (!d.date || !d.origin || !d.destination) { toast('請填寫日期、出發地、目的地', 'warn'); return; }
+  const { error } = await sb.from('trips').insert(d);
+  if (error) { toast('新增失敗：' + error.message, 'err'); return; }
+  toast('行程已新增！');
+  clearForm();
+  await loadTrips();
+}
+
+function clearForm() {
+  ['f-arrive','f-leave','f-origin','f-dest','f-purpose','f-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-km').value = '';
+  document.getElementById('f-etc-amt').value = '0';
+  document.getElementById('fuel-hint').textContent = '油資補貼：—';
+}
+
+// ── Edit trip ────────────────────────────────────────────────
+function openEdit(id) {
+  const t = allTrips.find(x => x.id === id); if (!t) return;
+  document.getElementById('edit-id').value = t.id;
+  document.getElementById('e-date').value = t.date;
+  document.getElementById('e-arrive').value = t.arrive_time || '';
+  document.getElementById('e-leave').value = t.leave_time || '';
+  document.getElementById('e-origin').value = t.origin;
+  document.getElementById('e-dest').value = t.destination;
+  document.getElementById('e-km').value = t.distance_km;
+  document.getElementById('e-etc').value = t.etc_fee || 0;
+  document.getElementById('e-rate').value = t.fuel_rate;
+  document.getElementById('e-purpose').value = t.purpose || '';
+  document.getElementById('e-note').value = t.note || '';
+  document.getElementById('edit-modal').classList.add('on');
+}
+
+async function saveEdit() {
+  const id = document.getElementById('edit-id').value;
+  const d = {
+    date: document.getElementById('e-date').value,
+    arrive_time: document.getElementById('e-arrive').value || null,
+    leave_time: document.getElementById('e-leave').value || null,
+    origin: document.getElementById('e-origin').value.trim(),
+    destination: document.getElementById('e-dest').value.trim(),
+    distance_km: parseFloat(document.getElementById('e-km').value) || 0,
+    etc_fee: parseInt(document.getElementById('e-etc').value) || 0,
+    fuel_rate: parseFloat(document.getElementById('e-rate').value) || 4,
+    purpose: document.getElementById('e-purpose').value.trim(),
+    note: document.getElementById('e-note').value.trim(),
+    updated_at: new Date().toISOString(),
+  };
+  d.fuel_subsidy = Math.round(d.distance_km * d.fuel_rate);
+  await sb.from('trips').update(d).eq('id', id);
+  closeModal(); toast('已更新！'); await loadTrips();
+}
+
+async function delTrip(id) {
+  if (!confirm('確定刪除此行程？')) return;
+  await sb.from('trips').delete().eq('id', id);
+  toast('已刪除'); await loadTrips();
+}
+
+function closeModal() { document.getElementById('edit-modal').classList.remove('on'); }
+document.getElementById('edit-modal').addEventListener('click', e => { if (e.target === document.getElementById('edit-modal')) closeModal(); });
+
+// ── ETC ──────────────────────────────────────────────────────
+async function loadEtc() {
+  const { data } = await sb.from('etc_records').select('*').order('toll_time', { ascending: false });
+  allEtc = data || [];
+  renderEtc();
+}
+
+function renderEtc() {
+  const list = document.getElementById('etc-list');
+  document.getElementById('etc-count').textContent = `共 ${allEtc.length} 筆，合計 $${fmt(allEtc.reduce((a,e)=>a+e.amount,0))}`;
+  if (!allEtc.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-i">🛣</div><div>尚無 ETC 記錄</div></div>';
+    return;
+  }
+  list.innerHTML = allEtc.map(e => `
+    <div class="etc-item">
+      <div>
+        <div class="etc-amt">$${fmt(e.amount)}</div>
+        <div class="etc-info">${e.toll_time ? e.toll_time.slice(0,16).replace('T',' ') : '—'} ${e.highway ? '・' + e.highway : ''} ${e.note ? '・' + e.note : ''}</div>
+      </div>
+      <button class="btn btn-danger" onclick="delEtc(${e.id})">刪</button>
+    </div>
+  `).join('');
+}
+
+async function addEtc() {
+  const amt = parseInt(document.getElementById('etc-amt').value);
+  if (!amt) { toast('請輸入金額', 'warn'); return; }
+  const etcDate = document.getElementById('etc-date').value;
+  const etcTime = document.getElementById('etc-time').value;
+  const d = {
+    amount: amt,
+    toll_time: etcDate && etcTime ? `${etcDate}T${etcTime}:00+08:00` : etcDate ? `${etcDate}T00:00:00+08:00` : null,
+    highway: document.getElementById('etc-highway').value.trim(),
+    note: document.getElementById('etc-note').value.trim(),
+    source: 'manual',
+  };
+
+  // Check ETC limit
+  const limit = settings.etc_limit || 0;
+  if (limit > 0 && amt > limit) {
+    toast(`ETC 金額 $${amt} 超過上限 $${limit}`, 'warn');
+  }
+
+  const { error } = await sb.from('etc_records').insert(d);
+  if (error) { toast('新增失敗', 'err'); return; }
+  toast('ETC 已新增！');
+  document.getElementById('etc-amt').value = '';
+  document.getElementById('etc-time').value = '';
+  document.getElementById('etc-highway').value = '';
+  document.getElementById('etc-note').value = '';
+  await loadEtc();
+}
+
+async function delEtc(id) {
+  if (!confirm('確定刪除此 ETC 記錄？')) return;
+  await sb.from('etc_records').delete().eq('id', id);
+  toast('已刪除'); await loadEtc();
+}
+
+// ── Filter helpers ───────────────────────────────────────────
+function setThisMonth() {
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0');
+  const last = new Date(y, now.getMonth()+1, 0).getDate();
+  document.getElementById('filter-from').value = `${y}-${m}-01`;
+  document.getElementById('filter-to').value = `${y}-${m}-${last}`;
+  loadTrips();
+}
+function setLastMonth() {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0');
+  const last = new Date(y, d.getMonth()+1, 0).getDate();
+  document.getElementById('filter-from').value = `${y}-${m}-01`;
+  document.getElementById('filter-to').value = `${y}-${m}-${last}`;
+  loadTrips();
+}
+function clearFilter() {
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value = '';
+  loadTrips();
+}
+
+// ── Export ───────────────────────────────────────────────────
+function expThisMonth() {
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,'0');
+  const last = new Date(y, now.getMonth()+1, 0).getDate();
+  document.getElementById('exp-from').value = `${y}-${m}-01`;
+  document.getElementById('exp-to').value = `${y}-${m}-${last}`;
+  previewExport();
+}
+function expLastMonth() {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0');
+  const last = new Date(y, d.getMonth()+1, 0).getDate();
+  document.getElementById('exp-from').value = `${y}-${m}-01`;
+  document.getElementById('exp-to').value = `${y}-${m}-${last}`;
+  previewExport();
+}
+
+async function previewExport() {
+  const from = document.getElementById('exp-from').value;
+  const to = document.getElementById('exp-to').value;
+  if (!from || !to) return;
+  let q = sb.from('trips').select('*').order('date').order('arrive_time');
+  if (from) q = q.gte('date', from);
+  if (to) q = q.lte('date', to);
+  const { data } = await q;
+  const trips = data || [];
+  const km  = trips.reduce((a, t) => a + (t.distance_km||0), 0);
+  const etc = trips.reduce((a, t) => a + (t.etc_fee||0), 0);
+  const fuel= trips.reduce((a, t) => a + Math.round((t.distance_km||0)*(t.fuel_rate||4)), 0);
+  document.getElementById('exp-count').textContent = trips.length;
+  document.getElementById('exp-km').textContent = km.toFixed(1) + ' km';
+  document.getElementById('exp-total').textContent = '$' + fmt(etc + fuel);
+  const tbody = document.getElementById('exp-body');
+  const empty = document.getElementById('exp-empty');
+  if (!trips.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = trips.map((t, i) => {
+    const fuel2 = Math.round((t.distance_km||0)*(t.fuel_rate||4));
+    return `<tr>
+      <td class="mono" style="color:var(--muted)">${i+1}</td>
+      <td class="mono">${t.date}</td>
+      <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.origin}</td>
+      <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.destination}</td>
+      <td><span class="badge bkm">${t.distance_km} km</span></td>
+      <td><span class="badge betc">${(t.etc_fee||0)>0?'$'+fmt(t.etc_fee||0):'—'}</span></td>
+      <td><span class="badge bfuel">$${fmt(fuel2)}</span></td>
+      <td><span class="badge btotal">$${fmt((t.etc_fee||0)+fuel2)}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${t.purpose||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function exportExcel() {
+  const from = document.getElementById('exp-from').value;
+  const to = document.getElementById('exp-to').value;
+  if (!from || !to) { toast('請選擇日期範圍', 'warn'); return; }
+  let q = sb.from('trips').select('*').order('date').order('arrive_time');
+  if (from) q = q.gte('date', from);
+  if (to) q = q.lte('date', to);
+  const { data: trips } = await q;
+  if (!trips?.length) { toast('此範圍無資料', 'warn'); return; }
+
+  // Build CSV (Excel-compatible)
+  const bom = '\uFEFF';
+  const headers = ['#','日期','抵達時間','離開時間','出發地','目的地','行駛距離(km)','ETC過路費(元)','油資標準(元/km)','油資補貼(元)','合計(元)','出差事由','備註','來源'];
+  const rows = trips.map((t, i) => {
+    const fuel = Math.round((t.distance_km||0)*(t.fuel_rate||4));
+    return [i+1, t.date, t.arrive_time||'', t.leave_time||'', `"${t.origin}"`, `"${t.destination}"`,
+      t.distance_km, t.etc_fee||0, t.fuel_rate, fuel, (t.etc_fee||0)+fuel,
+      `"${t.purpose||''}"`, `"${t.note||''}"`, t.source];
+  });
+
+  // Totals row
+  const totKm = trips.reduce((a,t)=>a+(t.distance_km||0),0).toFixed(1);
+  const totEtc = trips.reduce((a,t)=>a+(t.etc_fee||0),0);
+  const totFuel = trips.reduce((a,t)=>a+Math.round((t.distance_km||0)*(t.fuel_rate||4)),0);
+  rows.push(['合計','','','','','', totKm, totEtc,'', totFuel, totEtc+totFuel,'','','']);
+
+  const csv = bom + [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `出差記錄_${from}_${to}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast('Excel 已下載！');
+}
+
+// ── Utils ────────────────────────────────────────────────────
+const fmt = n => Math.round(n).toLocaleString('zh-TW');
+
+function copyUrl() {
+  navigator.clipboard.writeText(WEBHOOK_URL);
+  toast('網址已複製！');
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = type === 'ok' ? 'on' : type === 'err' ? 'err on' : 'warn on';
+  setTimeout(() => el.className = '', 2500);
+}
+</script>
+</body>
+</html>
