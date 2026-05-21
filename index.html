@@ -160,6 +160,10 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
 .copy-btn{position:absolute;top:6px;right:6px;background:rgba(0,212,255,.15);border:none;color:var(--accent);font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;font-family:var(--sans)}
 .copy-btn:hover{background:rgba(0,212,255,.3)}
 
+/* ── Re-geocode button ── */
+.btn-regeo{background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:var(--amber);border-radius:5px;padding:2px 8px;font-size:0.72rem;cursor:pointer;font-family:var(--sans);display:block;margin-top:3px;transition:all .15s;white-space:nowrap}
+.btn-regeo:hover{background:var(--amber);color:#000}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#000;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s;z-index:999;font-family:var(--sans)}
 #toast.on{opacity:1}
@@ -467,7 +471,8 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
       <div class="tbar">
         <div class="slabel">行程明細</div>
         <div style="flex:1"></div>
-        <div id="trip-count" style="font-size:11px;color:var(--muted)"></div>
+        <button class="btn btn-ghost btn-sm" id="regeo-all-btn" onclick="reGeocodeAll()" style="color:var(--amber);border-color:rgba(255,176,32,.3)">📍 批次查詢座標地址</button>
+        <div id="trip-count" style="font-size:0.79rem;color:var(--muted)"></div>
       </div>
       <div class="stats" style="grid-template-columns:repeat(3,1fr)">
         <div class="stat"><div class="stat-v c-green" id="ts-km">0.0</div><div class="stat-l">總里程 km</div></div>
@@ -806,6 +811,67 @@ async function saveSettings() {
   toast('設定已儲存');
 }
 
+// ── Reverse Geocode ──────────────────────────────────────────
+async function reGeocode(tripId, field, coordStr, lat, lng) {
+  const cellId = field === 'origin' ? `orig-${tripId}` : `dest-${tripId}`;
+  const cell = document.getElementById(cellId);
+  if (!cell) return;
+  cell.innerHTML = `<span style="color:var(--muted);font-size:0.79rem">查詢中…</span>`;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat.toString().trim()}&lon=${lng.toString().trim()}&format=json&accept-language=zh-TW`,
+      { headers: { 'User-Agent': 'TripTracker/1.0' } }
+    );
+    const data = await res.json();
+    let addr = coordStr;
+    if (data.address) {
+      const a = data.address;
+      const parts = [
+        a.road || a.pedestrian || a.footway || a.path,
+        a.suburb || a.neighbourhood || a.village,
+        a.city || a.town || a.county,
+      ].filter(Boolean);
+      addr = parts.join('，') || data.display_name?.split(',')[0] || coordStr;
+    }
+    // 更新資料庫
+    const update = {};
+    update[field] = addr;
+    await sb.from('trips').update(update).eq('id', tripId);
+    // 更新畫面
+    cell.innerHTML = `<span title="${addr}">${addr}</span>`;
+    // 更新記憶體中的資料
+    const trip = allTrips.find(t => t.id === tripId);
+    if (trip) trip[field] = addr;
+    toast('地址已更新！');
+  } catch (e) {
+    cell.innerHTML = `<span style="color:var(--red);font-size:0.79rem">查詢失敗</span>
+      <button class="btn-regeo" onclick="reGeocode(${tripId},'${field}','${coordStr}','${lat}','${lng}')">重試</button>`;
+  }
+}
+
+async function reGeocodeAll() {
+  const btn = document.getElementById('regeo-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '查詢中…'; }
+  const isCoord = (addr) => /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr?.trim());
+  const needsGeo = allTrips.filter(t => isCoord(t.origin) || isCoord(t.destination));
+  if (!needsGeo.length) { toast('沒有需要查詢的座標', 'warn'); if (btn) { btn.disabled = false; btn.textContent = '📍 批次查詢所有座標地址'; } return; }
+  let done = 0;
+  for (const t of needsGeo) {
+    if (isCoord(t.origin) && t.origin_lat) {
+      await reGeocode(t.id, 'origin', t.origin, t.origin_lat, t.origin_lng);
+      await new Promise(r => setTimeout(r, 1100)); // OSM rate limit
+    }
+    if (isCoord(t.destination) && t.destination_lat) {
+      await reGeocode(t.id, 'destination', t.destination, t.destination_lat, t.destination_lng);
+      await new Promise(r => setTimeout(r, 1100));
+    }
+    done++;
+    if (btn) btn.textContent = `查詢中 ${done}/${needsGeo.length}…`;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📍 批次查詢所有座標地址'; }
+  toast(`批次查詢完成！共 ${needsGeo.length} 筆`);
+}
+
 // ── Trips ────────────────────────────────────────────────────
 async function loadTrips() {
   const from = document.getElementById('filter-from')?.value;
@@ -847,19 +913,31 @@ function renderTrips() {
     const src = t.source === 'owntracks' ? '<span class="badge bkml">OT</span>'
               : t.source === 'kml' ? '<span class="badge bkml">KML</span>'
               : '<span class="bman">手動</span>';
-    return `<tr>
+    // 判斷是否為座標格式（數字,空格,數字 或 數字.數字, 數字.數字）
+    const isCoord = (addr) => /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(addr?.trim());
+    const originIsCoord = isCoord(t.origin);
+    const destIsCoord = isCoord(t.destination);
+    const originDisplay = originIsCoord
+      ? `<span style="color:var(--amber);font-family:var(--mono);font-size:0.79rem">${t.origin}</span>
+         <button class="btn-regeo" onclick="reGeocode(${t.id},'origin','${t.origin}','${t.origin_lat||t.origin.split(',')[0]}','${t.origin_lng||t.origin.split(',')[1]}')">📍查詢地址</button>`
+      : `<span title="${t.origin}">${t.origin}</span>`;
+    const destDisplay = destIsCoord
+      ? `<span style="color:var(--amber);font-family:var(--mono);font-size:0.79rem">${t.destination}</span>
+         <button class="btn-regeo" onclick="reGeocode(${t.id},'destination','${t.destination}','${t.destination_lat||t.destination.split(',')[0]}','${t.destination_lng||t.destination.split(',')[1]}')">📍查詢地址</button>`
+      : `<span title="${t.destination}">${t.destination}</span>`;
+    return `<tr id="trip-row-${t.id}">
       <td class="mono" style="color:var(--muted)">${allTrips.length - i}</td>
       <td class="mono">${t.date}</td>
       <td class="mono" style="color:var(--muted)">${t.arrive_time||'—'}</td>
       <td class="mono" style="color:var(--muted)">${t.leave_time||'—'}</td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.origin}">${t.origin}</td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.destination}">${t.destination}</td>
+      <td style="max-width:140px" id="orig-${t.id}">${originDisplay}</td>
+      <td style="max-width:140px" id="dest-${t.id}">${destDisplay}</td>
       <td><span class="badge bkm">${t.distance_km} km</span></td>
       <td><span class="badge betc">${(t.etc_fee||0)>0?'$'+fmt(t.etc_fee||0):'—'}</span></td>
       <td><span class="badge bfuel">$${fmt(fuel)}</span></td>
       <td><span class="badge btotal">$${fmt(total)}</span></td>
       <td>${src}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)">${t.purpose||'—'}</td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.79rem;color:var(--muted)">${t.purpose||'—'}</td>
       <td><div class="tdact">
         <button class="btn btn-edit" onclick="openEdit(${t.id})">編輯</button>
         <button class="btn btn-danger" onclick="delTrip(${t.id})">刪</button>
