@@ -464,7 +464,12 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         </div>
         <div class="setup-step">
           <div class="step-num">STEP 03</div>
-          <div class="step-text">裝置 ID：填你的名字<br>追蹤模式：移動（每100公尺）</div>
+          <div class="step-text">
+            <strong style="color:var(--accent)">你的 Device ID</strong>（請填這個，每人不同）
+            <div style="margin-top:6px;padding:8px 10px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:6px;font-family:monospace;font-size:0.93rem;color:var(--accent);text-align:center" id="my-device-id">—</div>
+            <div style="margin-top:6px;font-size:0.72rem;color:var(--muted)">Tracker ID（2 字元）：<span id="my-tracker-id" style="font-family:monospace;color:var(--accent)">—</span></div>
+            <div style="margin-top:8px;font-size:0.72rem;color:var(--muted)">追蹤模式：建議「Significant Changes」（省電），出差時用網頁切到 Move</div>
+          </div>
         </div>
       </div>
     </div>
@@ -924,10 +929,10 @@ async function initApp() {
   document.getElementById('owntracks-url').childNodes[0].textContent = WEBHOOK_URL;
   document.getElementById('webhook-url').textContent = WEBHOOK_URL;
   // 顯示個人 Device ID 提示
-  const dvInfo = document.getElementById('owntracks-url');
-  if (dvInfo && currentUser.device_id) {
-    // OK
-  }
+  const myDeviceEl = document.getElementById('my-device-id');
+  const myTrackerEl = document.getElementById('my-tracker-id');
+  if (myDeviceEl) myDeviceEl.textContent = currentUser.device_id || '（未設定，請聯絡管理員）';
+  if (myTrackerEl) myTrackerEl.textContent = currentUser.tracker_id || '—';
 
   await loadCurrentSettings();
   await loadTrips();
