@@ -746,6 +746,50 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         </div>
 
         <div class="setting-group">
+          <div class="setting-title">🚗 自動停止記錄</div>
+          <div style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            記錄中如長時間沒移動（例如忘記按停止），自動詢問是否停止。
+          </div>
+          <div class="fgroup" style="margin-bottom:12px">
+            <div class="flabel">啟用自動停止</div>
+            <select id="s-autostop-enabled">
+              <option value="false">關閉</option>
+              <option value="true">啟用</option>
+            </select>
+          </div>
+          <div id="autostop-options" style="display:none">
+            <div class="fgroup" style="margin-bottom:12px">
+              <div class="flabel">未移動多少分鐘後提示</div>
+              <input type="number" id="s-autostop-minutes" value="10" min="1" max="120" step="1">
+            </div>
+            <div class="fgroup" style="margin-bottom:12px">
+              <div class="flabel">判斷方式</div>
+              <select id="s-autostop-method">
+                <option value="speed">速度判斷</option>
+                <option value="position">位置判斷</option>
+                <option value="both">兩者皆要符合</option>
+              </select>
+            </div>
+            <div class="grid2">
+              <div class="fgroup">
+                <div class="flabel">速度閾值 (km/h)</div>
+                <input type="number" id="s-autostop-speed" value="5" min="0" step="0.5">
+              </div>
+              <div class="fgroup">
+                <div class="flabel">位置閾值 (公尺)</div>
+                <input type="number" id="s-autostop-distance" value="100" min="10" step="10">
+              </div>
+            </div>
+          </div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:10px;line-height:1.7">
+            • 速度判斷：最近 N 分鐘所有座標速度都低於閾值<br>
+            • 位置判斷：最近 N 分鐘最遠位移小於閾值<br>
+            • 兩者皆要符合：需同時達成（最嚴格）<br>
+            • 條件成立會跳通知，60 秒未確認則自動取消
+          </div>
+        </div>
+
+        <div class="setting-group">
           <div class="setting-title">OwnTracks Webhook 網址</div>
           <div class="code-block" id="webhook-url" style="font-size:12px">載入中...</div>
           <div style="font-size:11px;color:var(--muted);margin-top:6px">複製此網址貼到 OwnTracks App 的 HTTP 端點設定</div>
@@ -1118,6 +1162,8 @@ async function initApp() {
 
   // 初始化充電偵測
   await initBatteryMonitor();
+  // 如果恢復了追蹤狀態，啟動自動停止監測
+  if (tracking) startAutoStopMonitor();
 }
 
 function setDefaultDates() {
@@ -1281,6 +1327,8 @@ async function startTracking() {
   localStorage.setItem('tracking_' + currentUser.id, JSON.stringify({ start: trackStart.toISOString() }));
   await checkLastLocation();
   await writeLog('tracking_start', null, null, { mode: 'Move' });
+  // 啟動自動停止監測（如果有開啟）
+  startAutoStopMonitor();
 }
 
 async function stopTracking() {
@@ -1300,6 +1348,8 @@ async function stopTracking() {
   localStorage.removeItem('tracking_' + currentUser.id);
   const duration = trackStart ? Math.round((Date.now() - trackStart.getTime()) / 60000) : 0;
   await writeLog('tracking_stop', null, null, { duration_min: duration });
+  // 停止自動停止監測
+  stopAutoStopMonitor();
 }
 
 function updateTrackTime() {
@@ -1342,6 +1392,18 @@ async function loadCurrentSettings() {
   document.getElementById('f-rate').value = currentUser.fuel_rate || 4;
   document.getElementById('s-charge-trigger').value = currentUser.charge_trigger_mode || 'off';
   document.getElementById('s-charge-unplug').value = currentUser.charge_unplug_mode || 'ask';
+  document.getElementById('s-autostop-enabled').value = currentUser.auto_stop_enabled ? 'true' : 'false';
+  document.getElementById('s-autostop-minutes').value = currentUser.auto_stop_minutes || 10;
+  document.getElementById('s-autostop-method').value = currentUser.auto_stop_method || 'speed';
+  document.getElementById('s-autostop-speed').value = currentUser.auto_stop_speed ?? 5;
+  document.getElementById('s-autostop-distance').value = currentUser.auto_stop_distance || 100;
+  // 控制細項顯示
+  document.getElementById('autostop-options').style.display =
+    currentUser.auto_stop_enabled ? '' : 'none';
+  document.getElementById('s-autostop-enabled').onchange = (e) => {
+    document.getElementById('autostop-options').style.display =
+      e.target.value === 'true' ? '' : 'none';
+  };
   // 公司資訊由 admin 在公司設定，員工只看不改
   const { data: comp } = await sb.from('companies').select('*').eq('id', currentUser.company_id).single();
   if (comp) {
@@ -1361,13 +1423,18 @@ async function loadCurrentSettings() {
 }
 
 async function saveSettings() {
-  // 個人設定：fuel_rate, etc_limit, upload_mode, charge_*
+  // 個人設定：fuel_rate, etc_limit, upload_mode, charge_*, auto_stop_*
   const userUpdate = {
     fuel_rate: parseFloat(document.getElementById('s-rate').value) || 4,
     etc_limit: parseInt(document.getElementById('s-etclimit').value) || 0,
     upload_mode: document.getElementById('s-upload').value,
     charge_trigger_mode: document.getElementById('s-charge-trigger').value,
     charge_unplug_mode: document.getElementById('s-charge-unplug').value,
+    auto_stop_enabled: document.getElementById('s-autostop-enabled').value === 'true',
+    auto_stop_minutes: parseInt(document.getElementById('s-autostop-minutes').value) || 10,
+    auto_stop_method: document.getElementById('s-autostop-method').value,
+    auto_stop_speed: parseFloat(document.getElementById('s-autostop-speed').value) || 5,
+    auto_stop_distance: parseInt(document.getElementById('s-autostop-distance').value) || 100,
     updated_at: new Date().toISOString(),
   };
   await sb.from('users').update(userUpdate).eq('id', currentUser.id);
@@ -1375,6 +1442,8 @@ async function saveSettings() {
   document.getElementById('f-rate').value = userUpdate.fuel_rate;
   // 重新初始化充電偵測（設定變更時）
   await initBatteryMonitor();
+  // 重新啟動自動停止監測
+  restartAutoStopMonitor();
 
   // 公司設定：只有 admin 能改
   if (currentUser.role === 'admin') {
@@ -2207,6 +2276,8 @@ const LOG_LABELS = {
   'password_changed': '改密碼',
   'tracking_start': '開始記錄',
   'tracking_stop': '停止記錄',
+  'auto_stop_triggered': '自動停止提示',
+  'charge_detected': '充電偵測',
   'trip_add': '新增行程',
   'trip_edit': '編輯行程',
   'trip_delete': '刪除行程',
@@ -2429,6 +2500,174 @@ function showChargeNotification(title, message, onConfirm, onCancel) {
 
   // 60 秒後自動關閉
   setTimeout(() => div.remove(), 60000);
+}
+
+// ════════════════════════════════════════════════════════════
+// ─── 自動停止記錄（防呆） ────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+
+let autoStopTimer = null;
+let autoStopNotifying = false; // 防止重複跳通知
+
+// 啟動監測（記錄開始時）
+function startAutoStopMonitor() {
+  if (!currentUser?.auto_stop_enabled) return;
+  stopAutoStopMonitor(); // 先清掉舊的
+  // 每 60 秒檢查一次
+  autoStopTimer = setInterval(checkAutoStop, 60 * 1000);
+  console.log('Auto-stop monitor started');
+}
+
+// 停止監測
+function stopAutoStopMonitor() {
+  if (autoStopTimer) {
+    clearInterval(autoStopTimer);
+    autoStopTimer = null;
+  }
+  autoStopNotifying = false;
+}
+
+// 重啟（設定變更時呼叫）
+function restartAutoStopMonitor() {
+  if (tracking && currentUser?.auto_stop_enabled) {
+    startAutoStopMonitor();
+  } else {
+    stopAutoStopMonitor();
+  }
+}
+
+// 主邏輯：檢查是否該提示停止
+async function checkAutoStop() {
+  if (!tracking || !currentUser?.auto_stop_enabled) return;
+  if (autoStopNotifying) return; // 通知還掛著就先跳過
+
+  const minutes = currentUser.auto_stop_minutes || 10;
+  const method = currentUser.auto_stop_method || 'speed';
+  const speedThreshold = currentUser.auto_stop_speed ?? 5;
+  const distThreshold = currentUser.auto_stop_distance || 100;
+  const sinceTime = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+
+  try {
+    // 取得這段時間的所有座標
+    const { data: locs } = await sb
+      .from('locations')
+      .select('lat, lng, speed, recorded_at')
+      .eq('user_id', currentUser.id)
+      .gte('recorded_at', sinceTime)
+      .order('recorded_at', { ascending: true });
+
+    // 要有資料才能判斷
+    if (!locs || locs.length < 2) return;
+
+    // 速度判斷：所有座標的速度都低於閾值
+    const speedOk = locs.every(l => (l.speed || 0) < speedThreshold);
+
+    // 位置判斷：最遠的兩點距離小於閾值
+    let positionOk = true;
+    if (method === 'position' || method === 'both') {
+      let maxDist = 0;
+      for (let i = 0; i < locs.length; i++) {
+        for (let j = i + 1; j < locs.length; j++) {
+          const d = haversineMeters(locs[i].lat, locs[i].lng, locs[j].lat, locs[j].lng);
+          if (d > maxDist) maxDist = d;
+        }
+      }
+      positionOk = maxDist < distThreshold;
+    }
+
+    let triggered = false;
+    if (method === 'speed') triggered = speedOk;
+    else if (method === 'position') triggered = positionOk;
+    else if (method === 'both') triggered = speedOk && positionOk;
+
+    if (triggered) {
+      autoStopNotifying = true;
+      const startTime = new Date(locs[0].recorded_at);
+      const elapsedMin = Math.round((Date.now() - startTime.getTime()) / 60000);
+      await writeLog('auto_stop_triggered', null, null, {
+        method, minutes, elapsed_min: elapsedMin
+      });
+      showAutoStopNotification(elapsedMin, method);
+    }
+
+  } catch (e) {
+    console.error('checkAutoStop failed:', e);
+  }
+}
+
+// Haversine 公式計算兩點距離（公尺）
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // 地球半徑（公尺）
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// 顯示停止確認通知
+function showAutoStopNotification(elapsedMin, method) {
+  // 移除之前的通知
+  const old = document.getElementById('autostop-notify');
+  if (old) old.remove();
+
+  const methodLabel = {
+    'speed': '速度判斷',
+    'position': '位置判斷',
+    'both': '速度+位置判斷'
+  }[method] || method;
+
+  const div = document.createElement('div');
+  div.id = 'autostop-notify';
+  div.style.cssText = `
+    position:fixed;top:20px;right:20px;z-index:9500;
+    background:var(--card);border:2px solid var(--amber);border-radius:12px;
+    padding:16px 18px;box-shadow:0 8px 32px rgba(255,176,32,.3);
+    max-width:340px;min-width:280px;
+    animation:slideIn 0.3s ease-out;
+  `;
+  div.innerHTML = `
+    <div style="font-size:1.07rem;font-weight:700;color:var(--amber);margin-bottom:6px">🚗 長時間未移動</div>
+    <div style="font-size:0.93rem;color:var(--text);margin-bottom:6px">已經 ${elapsedMin} 分鐘沒有移動了。</div>
+    <div style="font-size:0.79rem;color:var(--muted);margin-bottom:14px">判斷方式：${methodLabel}</div>
+    <div style="font-size:0.79rem;color:var(--muted);margin-bottom:14px">是否要停止記錄？60 秒未確認自動取消。</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" id="autostop-cancel">繼續記錄</button>
+      <button class="btn btn-primary btn-sm" id="autostop-confirm" style="background:var(--amber);border-color:var(--amber)">停止記錄</button>
+    </div>
+  `;
+  document.body.appendChild(div);
+
+  // 瀏覽器原生通知
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('🚗 長時間未移動', {
+      body: `已經 ${elapsedMin} 分鐘沒有移動，要停止記錄嗎？`,
+      icon: '⚠️'
+    });
+  }
+
+  document.getElementById('autostop-confirm').onclick = async () => {
+    div.remove();
+    autoStopNotifying = false;
+    await stopTracking();
+    toast('已自動停止記錄', 'ok');
+  };
+  document.getElementById('autostop-cancel').onclick = () => {
+    div.remove();
+    autoStopNotifying = false;
+    // 5 分鐘內不再提示（避免一直跳）
+    setTimeout(() => {}, 5 * 60 * 1000);
+    toast('繼續記錄中', 'ok');
+  };
+
+  // 60 秒後自動關閉（視為取消）
+  setTimeout(() => {
+    if (div.parentNode) {
+      div.remove();
+      autoStopNotifying = false;
+    }
+  }, 60000);
 }
 </script>
 </body>
