@@ -259,6 +259,54 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
 </head>
 <body>
 
+<!-- ════════════════════════════════════════════════════════════
+     登入頁面（未登入時顯示）
+     ════════════════════════════════════════════════════════════ -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:var(--bg);align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:380px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),#006699);display:inline-flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 30px rgba(0,212,255,.3);margin-bottom:14px">🚗</div>
+      <h1 style="margin:0;font-size:1.43rem;font-weight:600;color:var(--text)">出差行車記錄</h1>
+      <div style="font-size:0.79rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px">Trip Tracker Pro</div>
+    </div>
+    <div class="card" style="padding:24px">
+      <div id="login-mode-default">
+        <div class="fgroup" style="margin-bottom:14px">
+          <div class="flabel">Email</div>
+          <input type="email" id="login-email" placeholder="your@email.com" autocomplete="username">
+        </div>
+        <div class="fgroup" style="margin-bottom:18px">
+          <div class="flabel">密碼</div>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:0.93rem" onclick="doLogin()" id="login-btn">登入</button>
+        <div id="login-error" style="font-size:0.79rem;color:var(--red);margin-top:10px;text-align:center;display:none"></div>
+      </div>
+
+      <div id="login-mode-change" style="display:none">
+        <div style="font-size:0.86rem;color:var(--amber);margin-bottom:14px" id="change-pwd-title">首次登入，請設定新密碼</div>
+        <div class="fgroup" style="margin-bottom:14px">
+          <div class="flabel">新密碼（至少 6 字元）</div>
+          <input type="password" id="new-password" placeholder="••••••••">
+        </div>
+        <div class="fgroup" style="margin-bottom:18px">
+          <div class="flabel">確認密碼</div>
+          <input type="password" id="new-password2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doChangePassword()">
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:0.93rem" onclick="doChangePassword()">設定密碼</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:0.72rem;color:var(--dim)">
+      由管理員建立帳號 · 員工請洽公司管理員
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     登入後的主畫面（app-wrap 預設隱藏，登入後才顯示）
+     ════════════════════════════════════════════════════════════ -->
+<div id="app-wrap" style="display:none">
+
 <header>
   <div class="logo">
     <div class="logo-mark">🚗</div>
@@ -272,6 +320,14 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
       <div class="hstat"><div class="hstat-v" id="h-km">— km</div><div class="hstat-l">本月里程</div></div>
       <div class="hstat"><div class="hstat-v" id="h-etc">$—</div><div class="hstat-l">本月 ETC</div></div>
       <div class="hstat"><div class="hstat-v" id="h-total">$—</div><div class="hstat-l">本月補貼</div></div>
+    </div>
+    <!-- 使用者資訊 -->
+    <div style="display:flex;align-items:center;gap:10px;padding-left:12px;border-left:1px solid var(--border)">
+      <div style="text-align:right">
+        <div style="font-size:0.86rem;font-weight:600;color:var(--text)" id="hdr-user-name">—</div>
+        <div style="font-size:0.72rem;color:var(--muted)" id="hdr-user-role">—</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()" title="登出">登出</button>
     </div>
     <div class="fs-picker">
       <span class="fs-label">字體：</span>
@@ -288,6 +344,7 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
   <div class="tab on" onclick="gotoTab('track')">🔴 追蹤控制</div>
   <div class="tab" onclick="gotoTab('trips')">📋 行程記錄</div>
   <div class="tab" onclick="gotoTab('etc')">🛣 ETC 費用</div>
+  <div class="tab admin-only" onclick="gotoTab('admin')" style="display:none">👥 員工管理</div>
   <div class="tab" onclick="gotoTab('settings')">⚙️ 設定</div>
   <div class="tab" onclick="gotoTab('export')">⬇ 匯出</div>
 </div>
@@ -437,6 +494,26 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
       </div>
     </div>
 
+    <!-- Admin side（管理員專用） -->
+    <div class="side-panel" id="sp-admin">
+      <div class="card">
+        <div class="card-title">➕ 新增員工</div>
+        <div style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;line-height:1.6">建立新員工帳號，分發初始密碼後請員工自行修改</div>
+        <button class="btn btn-primary" style="width:100%" onclick="openNewUser()">＋ 新增員工帳號</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 查看員工資料</div>
+        <div style="font-size:0.79rem;color:var(--muted);margin-bottom:10px">切換到「行程記錄」或「匯出」頁時，可選擇查看特定員工或全部員工</div>
+        <div class="fgroup">
+          <div class="flabel">當前查看對象</div>
+          <select id="view-target" onchange="changeViewTarget()">
+            <option value="self">我自己</option>
+            <option value="all">全部員工</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <!-- Export side -->
     <div class="side-panel" id="sp-export">
       <div class="card">
@@ -569,6 +646,36 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
       </div>
     </div>
 
+    <!-- 員工管理 main（管理員專用） -->
+    <div id="main-admin" style="display:none">
+      <div class="tbar">
+        <div class="slabel">員工帳號管理</div>
+        <div style="flex:1"></div>
+        <div id="user-count" style="font-size:0.79rem;color:var(--muted)"></div>
+      </div>
+      <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="stat"><div class="stat-v c-cyan" id="adm-total">0</div><div class="stat-l">員工總數</div></div>
+        <div class="stat"><div class="stat-v c-green" id="adm-active">0</div><div class="stat-l">啟用中</div></div>
+        <div class="stat"><div class="stat-v c-amber" id="adm-admin">0</div><div class="stat-l">管理員</div></div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>姓名</th><th>Email</th><th>角色</th><th>部門</th>
+            <th>Device ID</th><th>費率</th><th>狀態</th><th>操作</th>
+          </tr></thead>
+          <tbody id="admin-users-body"></tbody>
+        </table>
+      </div>
+      <div style="font-size:0.79rem;color:var(--muted);margin-top:12px;line-height:1.7;padding:12px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);border-radius:8px">
+        ℹ️ <strong>新增員工流程：</strong><br>
+        1. 點左側「➕ 新增員工」填入資料（姓名、Email、Device ID 等）<br>
+        2. 系統會自動建立 Auth 帳號 + 員工資料<br>
+        3. 把初始密碼告訴員工，請他到 OwnTracks App 設定對應的 Device ID<br>
+        4. 員工首次登入需強制改密碼
+      </div>
+    </div>
+
     <!-- Export main -->
     <div id="main-export" style="display:none">
       <div class="slabel" style="margin-bottom:14px">匯出預覽</div>
@@ -613,6 +720,40 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     員工管理 Modal（管理員專用）
+     ════════════════════════════════════════════════════════════ -->
+<div class="overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-title" id="user-modal-title">➕ 新增員工</div>
+    <input type="hidden" id="user-edit-id">
+    <div class="grid2">
+      <div class="fgroup full"><div class="flabel">姓名 *</div><input type="text" id="u-name" placeholder="王小明"></div>
+      <div class="fgroup full"><div class="flabel">Email *</div><input type="email" id="u-email" placeholder="employee@company.com"></div>
+      <div class="fgroup full" id="u-pwd-group"><div class="flabel">初始密碼 *</div><input type="text" id="u-password" placeholder="預設 password123"></div>
+      <div class="fgroup"><div class="flabel">角色</div>
+        <select id="u-role">
+          <option value="employee">員工</option>
+          <option value="admin">管理員</option>
+        </select>
+      </div>
+      <div class="fgroup"><div class="flabel">部門（可選）</div><input type="text" id="u-dept" placeholder="業務部"></div>
+      <div class="fgroup"><div class="flabel">OwnTracks Device ID *</div><input type="text" id="u-device" placeholder="例：wang01"></div>
+      <div class="fgroup"><div class="flabel">Tracker ID（2字元）</div><input type="text" id="u-tracker" maxlength="2" placeholder="WM"></div>
+      <div class="fgroup"><div class="flabel">里程費率(元/km)</div><input type="number" id="u-fuel" value="4" step="0.5"></div>
+      <div class="fgroup"><div class="flabel">ETC 上限(元)</div><input type="number" id="u-etclimit" value="0"></div>
+    </div>
+    <div style="font-size:0.79rem;color:var(--muted);margin-top:10px;line-height:1.6" id="u-hint">
+      ※ 員工首次登入後需要強制改密碼<br>
+      ※ Device ID 是 OwnTracks 在手機 App 設定的識別碼，每人都不同
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeUserModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveUser()" id="save-user-btn">建立</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -629,13 +770,15 @@ let allTrips = [], allEtc = [], settings = {};
 let tracking = false, trackStart = null, trackTimer = null;
 let scheduleTimer = null;
 let currentTab = 'track';
+let currentUser = null;       // { id, email, name, role, device_id, fuel_rate, ... }
+let viewTarget = 'self';      // 'self' or 'all' (admin only)
+let allUsers = [];            // admin's user list
 
 // ── Font size control ────────────────────────────────────────
 const FS_SCALE = { xs: 0.78, sm: 0.88, md: 1.0, lg: 1.15, xl: 1.32 };
 function setFs(size) {
   const scale = FS_SCALE[size] || 1;
   document.documentElement.style.fontSize = (14 * scale) + 'px';
-  // Update all fs-btn active state (header + settings page)
   document.querySelectorAll('.fs-btn').forEach(b => {
     b.classList.remove('active');
     if (b.dataset.fs === size) b.classList.add('active');
@@ -645,11 +788,123 @@ function setFs(size) {
 
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // 載入字體大小設定
+  // 載入字體大小設定（登入前就要有）
   const savedFs = localStorage.getItem('fs') || 'md';
   setFs(savedFs);
+
+  // 檢查是否已登入
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await loadCurrentUser(session.user.id);
+  } else {
+    showLogin();
+  }
+});
+
+// ── Auth: Login ──────────────────────────────────────────────
+function showLogin() {
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app-wrap').style.display = 'none';
+  document.getElementById('login-mode-default').style.display = '';
+  document.getElementById('login-mode-change').style.display = 'none';
+  document.getElementById('login-email').focus();
+}
+
+function showApp() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app-wrap').style.display = '';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = '請填寫 Email 和密碼';
+    errEl.style.display = '';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '登入中…';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    await loadCurrentUser(data.user.id);
+  } catch (e) {
+    errEl.textContent = e.message?.includes('Invalid') ? 'Email 或密碼錯誤' : ('登入失敗：' + e.message);
+    errEl.style.display = '';
+    btn.disabled = false;
+    btn.textContent = '登入';
+  }
+}
+
+async function loadCurrentUser(authUserId) {
+  const { data, error } = await sb.from('users').select('*').eq('auth_user_id', authUserId).single();
+  if (error || !data) {
+    toast('帳號資料不存在，請聯絡管理員', 'err');
+    await sb.auth.signOut();
+    showLogin();
+    return;
+  }
+  if (!data.active) {
+    toast('帳號已停用，請聯絡管理員', 'err');
+    await sb.auth.signOut();
+    showLogin();
+    return;
+  }
+  currentUser = data;
+  // 首次登入要求改密碼
+  if (data.must_change_password) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('login-mode-default').style.display = 'none';
+    document.getElementById('login-mode-change').style.display = '';
+    document.getElementById('change-pwd-title').textContent = '首次登入，請設定新密碼';
+    return;
+  }
+  await initApp();
+}
+
+async function doChangePassword() {
+  const p1 = document.getElementById('new-password').value;
+  const p2 = document.getElementById('new-password2').value;
+  if (p1.length < 6) { toast('密碼至少 6 字元', 'warn'); return; }
+  if (p1 !== p2) { toast('兩次密碼不一致', 'warn'); return; }
+  try {
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if (error) throw error;
+    await sb.from('users').update({ must_change_password: false }).eq('id', currentUser.id);
+    currentUser.must_change_password = false;
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-password2').value = '';
+    toast('密碼已更新');
+    await initApp();
+  } catch (e) {
+    toast('更新失敗：' + e.message, 'err');
+  }
+}
+
+async function doLogout() {
+  if (!confirm('確定要登出嗎？')) return;
+  await sb.auth.signOut();
+  currentUser = null;
+  location.reload();
+}
+
+// ── App init（登入後） ─────────────────────────────────────────
+async function initApp() {
+  showApp();
+  // 顯示使用者資訊
+  document.getElementById('hdr-user-name').textContent = currentUser.name;
+  document.getElementById('hdr-user-role').textContent = currentUser.role === 'admin' ? '管理員' : '員工';
+  // admin 看得到的功能
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = currentUser.role === 'admin' ? '' : 'none';
+  });
+
   // 恢復追蹤狀態
-  const savedTracking = localStorage.getItem('tracking');
+  const savedTracking = localStorage.getItem('tracking_' + currentUser.id);
   if (savedTracking) {
     try {
       const t = JSON.parse(savedTracking);
@@ -664,17 +919,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       trackTimer = setInterval(updateTrackTime, 1000);
     } catch (_) {}
   }
+
   setDefaultDates();
   document.getElementById('owntracks-url').childNodes[0].textContent = WEBHOOK_URL;
   document.getElementById('webhook-url').textContent = WEBHOOK_URL;
-  await loadSettings();
+  // 顯示個人 Device ID 提示
+  const dvInfo = document.getElementById('owntracks-url');
+  if (dvInfo && currentUser.device_id) {
+    // OK
+  }
+
+  await loadCurrentSettings();
   await loadTrips();
   await loadEtc();
   updateHeaderStats();
   await checkLastLocation();
-  // 每 30 秒自動更新最後座標時間
   setInterval(checkLastLocation, 30000);
-});
+
+  // 如果是 admin，預載入員工清單
+  if (currentUser.role === 'admin') {
+    await loadAllUsers();
+  }
+}
 
 function setDefaultDates() {
   const today = new Date().toISOString().slice(0, 10);
@@ -689,18 +955,35 @@ function setDefaultDates() {
 
 // ── Tab navigation ───────────────────────────────────────────
 function gotoTab(tab) {
+  // 非 admin 不能進入 admin 分頁
+  if (tab === 'admin' && currentUser?.role !== 'admin') return;
   currentTab = tab;
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    const tabs = ['track','trips','etc','settings','export'];
-    t.classList.toggle('on', tabs[i] === tab);
-  });
-  ['track','trips','etc','settings','export'].forEach(t => {
-    document.getElementById(`sp-${t}`).classList.toggle('on', t === tab);
-    document.getElementById(`main-${t}`).style.display = t === tab ? '' : 'none';
+  const allTabs = ['track','trips','etc','admin','settings','export'];
+  // 更新 tab 樣式
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  const tabEls = document.querySelectorAll('.tab');
+  const idx = allTabs.indexOf(tab);
+  if (idx >= 0 && tabEls[idx]) tabEls[idx].classList.add('on');
+  // 切換內容區塊
+  allTabs.forEach(t => {
+    const sp = document.getElementById(`sp-${t}`);
+    const mn = document.getElementById(`main-${t}`);
+    if (sp) sp.classList.toggle('on', t === tab);
+    if (mn) mn.style.display = t === tab ? '' : 'none';
   });
   if (tab === 'trips') loadTrips();
   if (tab === 'etc') loadEtc();
+  if (tab === 'admin') loadAllUsers();
   if (tab === 'export') previewExport();
+}
+
+// ── 切換查看對象（admin 用） ─────────────────────────────────
+function changeViewTarget() {
+  viewTarget = document.getElementById('view-target').value;
+  loadTrips();
+  loadEtc();
+  updateHeaderStats();
+  toast(viewTarget === 'self' ? '已切換為查看自己' : '已切換為查看全部員工');
 }
 
 // ── Process OwnTracks trips ──────────────────────────────────
@@ -791,9 +1074,10 @@ function toggleTracking() {
 }
 
 async function setTrackingMode(mode) {
-  // mode 2 = Move（高頻）, mode 1 = Significant Changes（省電）
+  if (!currentUser) return;
   try {
-    await sb.from('settings').update({ tracking_mode: mode }).eq('id', 1);
+    await sb.from('users').update({ tracking_mode: mode }).eq('id', currentUser.id);
+    currentUser.tracking_mode = mode;
   } catch (e) {
     console.error('tracking mode update failed', e);
   }
@@ -814,7 +1098,7 @@ async function startTracking() {
   trackTimer = setInterval(updateTrackTime, 1000);
   await setTrackingMode(2);
   toast('開始記錄！OwnTracks 已切換為高頻模式');
-  localStorage.setItem('tracking', JSON.stringify({ start: trackStart.toISOString() }));
+  localStorage.setItem('tracking_' + currentUser.id, JSON.stringify({ start: trackStart.toISOString() }));
   await checkLastLocation();
 }
 
@@ -832,7 +1116,7 @@ async function stopTracking() {
   document.getElementById('mode-badge').style.color = 'var(--green)';
   await setTrackingMode(1);
   toast('記錄已停止，OwnTracks 切換回省電模式');
-  localStorage.removeItem('tracking');
+  localStorage.removeItem('tracking_' + currentUser.id);
 }
 
 function updateTrackTime() {
@@ -865,37 +1149,56 @@ function clearSchedule() {
   document.getElementById('sched-label').textContent = '';
 }
 
-// ── Settings ─────────────────────────────────────────────────
-async function loadSettings() {
-  const { data } = await sb.from('settings').select('*').eq('id', 1).single();
-  if (!data) return;
-  settings = data;
-  document.getElementById('s-company').value = data.company_name || '';
-  document.getElementById('s-address').value = data.company_address || '';
-  document.getElementById('s-lat').value = data.company_lat || '';
-  document.getElementById('s-lng').value = data.company_lng || '';
-  document.getElementById('s-radius').value = data.company_radius || 500;
-  document.getElementById('s-rate').value = data.fuel_rate || 4;
-  document.getElementById('s-etclimit').value = data.etc_limit || 0;
-  document.getElementById('s-upload').value = data.upload_mode || 'wifi';
-  document.getElementById('f-rate').value = data.fuel_rate || 4;
+// ── Settings（個人設定，從 users 表讀） ─────────────────────────
+async function loadCurrentSettings() {
+  if (!currentUser) return;
+  document.getElementById('s-company').value = ''; // 公司資訊現在不顯示這
+  document.getElementById('s-rate').value = currentUser.fuel_rate || 4;
+  document.getElementById('s-etclimit').value = currentUser.etc_limit || 0;
+  document.getElementById('s-upload').value = currentUser.upload_mode || 'wifi';
+  document.getElementById('f-rate').value = currentUser.fuel_rate || 4;
+  // 公司資訊由 admin 在公司設定，員工只看不改
+  const { data: comp } = await sb.from('companies').select('*').eq('id', currentUser.company_id).single();
+  if (comp) {
+    document.getElementById('s-company').value = comp.name || '';
+    document.getElementById('s-address').value = comp.address || '';
+    document.getElementById('s-lat').value = comp.lat || '';
+    document.getElementById('s-lng').value = comp.lng || '';
+    document.getElementById('s-radius').value = comp.radius || 500;
+  }
+  // 非 admin 不能改公司資訊
+  if (currentUser.role !== 'admin') {
+    ['s-company', 's-address', 's-lat', 's-lng', 's-radius'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.disabled = true; el.style.opacity = '0.6'; }
+    });
+  }
 }
 
 async function saveSettings() {
-  const d = {
-    company_name: document.getElementById('s-company').value,
-    company_address: document.getElementById('s-address').value,
-    company_lat: parseFloat(document.getElementById('s-lat').value) || null,
-    company_lng: parseFloat(document.getElementById('s-lng').value) || null,
-    company_radius: parseInt(document.getElementById('s-radius').value) || 500,
+  // 個人設定：fuel_rate, etc_limit, upload_mode
+  const userUpdate = {
     fuel_rate: parseFloat(document.getElementById('s-rate').value) || 4,
     etc_limit: parseInt(document.getElementById('s-etclimit').value) || 0,
     upload_mode: document.getElementById('s-upload').value,
     updated_at: new Date().toISOString(),
   };
-  await sb.from('settings').update(d).eq('id', 1);
-  settings = { ...settings, ...d };
-  document.getElementById('f-rate').value = d.fuel_rate;
+  await sb.from('users').update(userUpdate).eq('id', currentUser.id);
+  Object.assign(currentUser, userUpdate);
+  document.getElementById('f-rate').value = userUpdate.fuel_rate;
+
+  // 公司設定：只有 admin 能改
+  if (currentUser.role === 'admin') {
+    const compUpdate = {
+      name: document.getElementById('s-company').value,
+      address: document.getElementById('s-address').value,
+      lat: parseFloat(document.getElementById('s-lat').value) || null,
+      lng: parseFloat(document.getElementById('s-lng').value) || null,
+      radius: parseInt(document.getElementById('s-radius').value) || 500,
+      updated_at: new Date().toISOString(),
+    };
+    await sb.from('companies').update(compUpdate).eq('id', currentUser.company_id);
+  }
   toast('設定已儲存');
 }
 
@@ -962,9 +1265,14 @@ async function reGeocodeAll() {
 
 // ── Trips ────────────────────────────────────────────────────
 async function loadTrips() {
+  if (!currentUser) return;
   const from = document.getElementById('filter-from')?.value;
   const to = document.getElementById('filter-to')?.value;
-  let q = sb.from('trips').select('*').order('date', { ascending: false }).order('arrive_time', { ascending: false });
+  let q = sb.from('trips').select('*, users(name)').order('date', { ascending: false }).order('arrive_time', { ascending: false });
+  // 權限過濾：員工只能看自己；admin 可選自己或全部
+  if (currentUser.role !== 'admin' || viewTarget === 'self') {
+    q = q.eq('user_id', currentUser.id);
+  }
   if (from) q = q.gte('date', from);
   if (to) q = q.lte('date', to);
   const { data } = await q;
@@ -1069,7 +1377,9 @@ function calcFuel() {
 }
 
 async function addTrip() {
+  if (!currentUser) return;
   const d = {
+    user_id: currentUser.id,
     date: document.getElementById('f-date').value,
     arrive_time: document.getElementById('f-arrive').value || null,
     leave_time: document.getElementById('f-leave').value || null,
@@ -1147,7 +1457,12 @@ document.getElementById('edit-modal').addEventListener('click', e => { if (e.tar
 
 // ── ETC ──────────────────────────────────────────────────────
 async function loadEtc() {
-  const { data } = await sb.from('etc_records').select('*').order('toll_time', { ascending: false });
+  if (!currentUser) return;
+  let q = sb.from('etc_records').select('*').order('toll_time', { ascending: false });
+  if (currentUser.role !== 'admin' || viewTarget === 'self') {
+    q = q.eq('user_id', currentUser.id);
+  }
+  const { data } = await q;
   allEtc = data || [];
   renderEtc();
 }
@@ -1171,11 +1486,13 @@ function renderEtc() {
 }
 
 async function addEtc() {
+  if (!currentUser) return;
   const amt = parseInt(document.getElementById('etc-amt').value);
   if (!amt) { toast('請輸入金額', 'warn'); return; }
   const etcDate = document.getElementById('etc-date').value;
   const etcTime = document.getElementById('etc-time').value;
   const d = {
+    user_id: currentUser.id,
     amount: amt,
     toll_time: etcDate && etcTime ? `${etcDate}T${etcTime}:00+08:00` : etcDate ? `${etcDate}T00:00:00+08:00` : null,
     highway: document.getElementById('etc-highway').value.trim(),
@@ -1183,8 +1500,7 @@ async function addEtc() {
     source: 'manual',
   };
 
-  // Check ETC limit
-  const limit = settings.etc_limit || 0;
+  const limit = currentUser.etc_limit || 0;
   if (limit > 0 && amt > limit) {
     toast(`ETC 金額 $${amt} 超過上限 $${limit}`, 'warn');
   }
@@ -1249,10 +1565,14 @@ function expLastMonth() {
 }
 
 async function previewExport() {
+  if (!currentUser) return;
   const from = document.getElementById('exp-from').value;
   const to = document.getElementById('exp-to').value;
   if (!from || !to) return;
-  let q = sb.from('trips').select('*').order('date').order('arrive_time');
+  let q = sb.from('trips').select('*, users(name)').order('date').order('arrive_time');
+  if (currentUser.role !== 'admin' || viewTarget === 'self') {
+    q = q.eq('user_id', currentUser.id);
+  }
   if (from) q = q.gte('date', from);
   if (to) q = q.lte('date', to);
   const { data } = await q;
@@ -1267,11 +1587,12 @@ async function previewExport() {
   const empty = document.getElementById('exp-empty');
   if (!trips.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
   empty.style.display = 'none';
+  const showUser = currentUser.role === 'admin' && viewTarget === 'all';
   tbody.innerHTML = trips.map((t, i) => {
     const fuel2 = Math.round((t.distance_km||0)*(t.fuel_rate||4));
     return `<tr>
       <td class="mono" style="color:var(--muted)">${i+1}</td>
-      <td class="mono">${t.date}</td>
+      <td class="mono">${t.date}${showUser ? '<br><span style="font-size:0.7rem;color:var(--accent)">'+(t.users?.name||'—')+'</span>' : ''}</td>
       <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.origin}</td>
       <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.destination}</td>
       <td><span class="badge bkm">${t.distance_km} km</span></td>
@@ -1284,36 +1605,46 @@ async function previewExport() {
 }
 
 async function exportExcel() {
+  if (!currentUser) return;
   const from = document.getElementById('exp-from').value;
   const to = document.getElementById('exp-to').value;
   if (!from || !to) { toast('請選擇日期範圍', 'warn'); return; }
-  let q = sb.from('trips').select('*').order('date').order('arrive_time');
+  let q = sb.from('trips').select('*, users(name)').order('date').order('arrive_time');
+  if (currentUser.role !== 'admin' || viewTarget === 'self') {
+    q = q.eq('user_id', currentUser.id);
+  }
   if (from) q = q.gte('date', from);
   if (to) q = q.lte('date', to);
   const { data: trips } = await q;
   if (!trips?.length) { toast('此範圍無資料', 'warn'); return; }
 
-  // Build CSV (Excel-compatible)
+  const showUser = currentUser.role === 'admin' && viewTarget === 'all';
   const bom = '\uFEFF';
-  const headers = ['#','日期','抵達時間','離開時間','出發地','目的地','行駛距離(km)','ETC過路費(元)','油資標準(元/km)','油資補貼(元)','合計(元)','出差事由','備註','來源'];
+  const headers = showUser
+    ? ['#','員工','日期','抵達時間','離開時間','出發地','目的地','行駛距離(km)','ETC過路費(元)','油資標準(元/km)','油資補貼(元)','合計(元)','出差事由','備註','來源']
+    : ['#','日期','抵達時間','離開時間','出發地','目的地','行駛距離(km)','ETC過路費(元)','油資標準(元/km)','油資補貼(元)','合計(元)','出差事由','備註','來源'];
   const rows = trips.map((t, i) => {
     const fuel = Math.round((t.distance_km||0)*(t.fuel_rate||4));
-    return [i+1, t.date, t.arrive_time||'', t.leave_time||'', `"${t.origin}"`, `"${t.destination}"`,
+    const base = [t.date, t.arrive_time||'', t.leave_time||'', `"${t.origin}"`, `"${t.destination}"`,
       t.distance_km, t.etc_fee||0, t.fuel_rate, fuel, (t.etc_fee||0)+fuel,
       `"${t.purpose||''}"`, `"${t.note||''}"`, t.source];
+    return showUser ? [i+1, `"${t.users?.name||''}"`, ...base] : [i+1, ...base];
   });
 
-  // Totals row
   const totKm = trips.reduce((a,t)=>a+(t.distance_km||0),0).toFixed(1);
   const totEtc = trips.reduce((a,t)=>a+(t.etc_fee||0),0);
   const totFuel = trips.reduce((a,t)=>a+Math.round((t.distance_km||0)*(t.fuel_rate||4)),0);
-  rows.push(['合計','','','','','', totKm, totEtc,'', totFuel, totEtc+totFuel,'','','']);
+  const totalRow = showUser
+    ? ['合計','','','','','','', totKm, totEtc,'', totFuel, totEtc+totFuel,'','','']
+    : ['合計','','','','','', totKm, totEtc,'', totFuel, totEtc+totFuel,'','',''];
+  rows.push(totalRow);
 
   const csv = bom + [headers, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `出差記錄_${from}_${to}.csv`; a.click();
+  const suffix = showUser ? '_全公司' : '';
+  a.href = url; a.download = `出差記錄${suffix}_${from}_${to}.csv`; a.click();
   URL.revokeObjectURL(url);
   toast('Excel 已下載！');
 }
@@ -1330,6 +1661,188 @@ function toast(msg, type = 'ok') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.className = type === 'ok' ? 'on' : type === 'err' ? 'err on' : 'warn on';
   setTimeout(() => el.className = '', 2500);
+}
+
+// ════════════════════════════════════════════════════════════
+// ─── 員工管理（管理員專用） ───────────────────────────────────
+// ════════════════════════════════════════════════════════════
+
+async function loadAllUsers() {
+  if (currentUser?.role !== 'admin') return;
+  const { data } = await sb.from('users').select('*').order('id');
+  allUsers = data || [];
+  renderAdminUsers();
+}
+
+function renderAdminUsers() {
+  const tbody = document.getElementById('admin-users-body');
+  if (!tbody) return;
+  document.getElementById('user-count').textContent = `共 ${allUsers.length} 個帳號`;
+  document.getElementById('adm-total').textContent = allUsers.length;
+  document.getElementById('adm-active').textContent = allUsers.filter(u => u.active).length;
+  document.getElementById('adm-admin').textContent = allUsers.filter(u => u.role === 'admin').length;
+
+  if (!allUsers.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-i">👥</div><div>尚無員工</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allUsers.map((u, i) => `
+    <tr style="${u.active ? '' : 'opacity:0.5'}">
+      <td>${i + 1}</td>
+      <td><strong>${esc(u.name)}</strong></td>
+      <td style="font-size:0.79rem;color:var(--muted)">${esc(u.email)}</td>
+      <td>${u.role === 'admin'
+        ? '<span style="padding:2px 8px;border-radius:4px;background:rgba(255,176,32,.15);color:var(--amber);font-size:0.72rem">管理員</span>'
+        : '<span style="padding:2px 8px;border-radius:4px;background:rgba(0,212,255,.1);color:var(--accent);font-size:0.72rem">員工</span>'}</td>
+      <td>${esc(u.department || '—')}</td>
+      <td style="font-family:monospace;font-size:0.79rem">${esc(u.device_id || '—')}</td>
+      <td>$${u.fuel_rate}</td>
+      <td>${u.active
+        ? '<span style="color:var(--green)">●啟用</span>'
+        : '<span style="color:var(--muted)">○停用</span>'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openEditUser(${u.id})">編輯</button>
+        ${u.id !== currentUser.id ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive(${u.id})">${u.active ? '停用' : '啟用'}</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openNewUser() {
+  document.getElementById('user-modal-title').textContent = '➕ 新增員工';
+  document.getElementById('user-edit-id').value = '';
+  document.getElementById('u-name').value = '';
+  document.getElementById('u-email').value = '';
+  document.getElementById('u-password').value = 'password123';
+  document.getElementById('u-role').value = 'employee';
+  document.getElementById('u-dept').value = '';
+  document.getElementById('u-device').value = '';
+  document.getElementById('u-tracker').value = '';
+  document.getElementById('u-fuel').value = '4';
+  document.getElementById('u-etclimit').value = '0';
+  document.getElementById('u-pwd-group').style.display = '';
+  document.getElementById('save-user-btn').textContent = '建立';
+  document.getElementById('u-hint').innerHTML = '※ 員工首次登入後需要強制改密碼<br>※ Device ID 是 OwnTracks 在手機 App 設定的識別碼，每人都不同';
+  document.getElementById('user-modal').classList.add('on');
+}
+
+function openEditUser(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+  document.getElementById('user-modal-title').textContent = '✏️ 編輯員工';
+  document.getElementById('user-edit-id').value = u.id;
+  document.getElementById('u-name').value = u.name;
+  document.getElementById('u-email').value = u.email;
+  document.getElementById('u-role').value = u.role;
+  document.getElementById('u-dept').value = u.department || '';
+  document.getElementById('u-device').value = u.device_id || '';
+  document.getElementById('u-tracker').value = u.tracker_id || '';
+  document.getElementById('u-fuel').value = u.fuel_rate;
+  document.getElementById('u-etclimit').value = u.etc_limit;
+  document.getElementById('u-pwd-group').style.display = 'none'; // 編輯時不改密碼
+  document.getElementById('save-user-btn').textContent = '儲存';
+  document.getElementById('u-hint').innerHTML = '※ Email 變更需請員工重新登入<br>※ 若要重設密碼，請聯絡管理員手動於 Supabase 重設';
+  document.getElementById('user-modal').classList.add('on');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.remove('on');
+}
+
+async function saveUser() {
+  const editId = document.getElementById('user-edit-id').value;
+  const name = document.getElementById('u-name').value.trim();
+  const email = document.getElementById('u-email').value.trim();
+  const password = document.getElementById('u-password').value;
+  const role = document.getElementById('u-role').value;
+  const dept = document.getElementById('u-dept').value.trim();
+  const device = document.getElementById('u-device').value.trim();
+  const tracker = document.getElementById('u-tracker').value.trim().toUpperCase();
+  const fuel = parseFloat(document.getElementById('u-fuel').value) || 4;
+  const etclimit = parseInt(document.getElementById('u-etclimit').value) || 0;
+
+  if (!name || !email || !device) { toast('請填寫姓名、Email、Device ID', 'warn'); return; }
+
+  const btn = document.getElementById('save-user-btn');
+  btn.disabled = true;
+  btn.textContent = '處理中…';
+
+  try {
+    if (editId) {
+      // 編輯
+      const updateData = {
+        name, email, role,
+        department: dept || null,
+        device_id: device,
+        tracker_id: tracker || null,
+        fuel_rate: fuel,
+        etc_limit: etclimit,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await sb.from('users').update(updateData).eq('id', parseInt(editId));
+      if (error) throw error;
+      toast('員工資料已更新');
+    } else {
+      // 新增：必須先建立 Auth 帳號（公開 API 沒辦法做，必須用 Service Role）
+      // 這裡先建立 users 表，並提示管理員手動建立 Auth
+      if (!password || password.length < 6) { toast('密碼至少 6 字元', 'warn'); btn.disabled = false; btn.textContent = '建立'; return; }
+
+      // 嘗試用 signUp 註冊（會發送驗證信，或自動建立）
+      const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
+        email, password,
+        options: { data: { name } }
+      });
+      if (signUpErr) throw signUpErr;
+      if (!signUpData?.user?.id) throw new Error('Auth 帳號建立失敗');
+
+      // 建立 users 表記錄
+      const insertData = {
+        company_id: currentUser.company_id,
+        auth_user_id: signUpData.user.id,
+        email, name, role,
+        department: dept || null,
+        device_id: device,
+        tracker_id: tracker || null,
+        fuel_rate: fuel,
+        etc_limit: etclimit,
+        active: true,
+        must_change_password: true,
+      };
+      const { error: insErr } = await sb.from('users').insert(insertData);
+      if (insErr) throw insErr;
+      toast(`員工建立成功！初始密碼：${password}`);
+      // 重要：signUp 會把目前 session 切換成新建立的使用者
+      // 需要重新登入回 admin
+      alert(`員工建立完成！\n\n初始密碼：${password}\n\n請告知員工此密碼，首次登入後系統會要求修改。\n\n按確定後系統會重新登入。`);
+      // 重新登入回 admin
+      location.reload();
+      return;
+    }
+    closeUserModal();
+    await loadAllUsers();
+  } catch (e) {
+    toast('失敗：' + e.message, 'err');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editId ? '儲存' : '建立';
+  }
+}
+
+async function toggleUserActive(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+  const action = u.active ? '停用' : '啟用';
+  if (!confirm(`確定${action}員工「${u.name}」？`)) return;
+  await sb.from('users').update({ active: !u.active }).eq('id', userId);
+  toast(`已${action}員工「${u.name}」`);
+  await loadAllUsers();
+}
+
+// 工具函式
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 </script>
 </body>
