@@ -345,6 +345,7 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
   <div class="tab" onclick="gotoTab('trips')">📋 行程記錄</div>
   <div class="tab" onclick="gotoTab('etc')">🛣 ETC 費用</div>
   <div class="tab admin-only" onclick="gotoTab('admin')" style="display:none">👥 員工管理</div>
+  <div class="tab" onclick="gotoTab('logs')">📜 操作紀錄</div>
   <div class="tab" onclick="gotoTab('settings')">⚙️ 設定</div>
   <div class="tab" onclick="gotoTab('export')">⬇ 匯出</div>
 </div>
@@ -497,6 +498,26 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         <div class="card-title">💾 儲存設定</div>
         <button class="btn btn-green" style="width:100%" onclick="saveSettings()">✓ 儲存所有設定</button>
       </div>
+      <div class="card">
+        <div class="card-title">🔐 修改密碼</div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">目前密碼</div>
+          <input type="password" id="cp-current" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">新密碼（至少 6 字元）</div>
+          <input type="password" id="cp-new" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="fgroup" style="margin-bottom:12px">
+          <div class="flabel">確認新密碼</div>
+          <input type="password" id="cp-new2" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="changeMyPassword()">🔐 更新密碼</button>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:10px;line-height:1.6">
+          • 密碼至少 6 字元<br>
+          • 更新後請記得用新密碼登入
+        </div>
+      </div>
     </div>
 
     <!-- Admin side（管理員專用） -->
@@ -512,6 +533,49 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         <div class="fgroup">
           <div class="flabel">當前查看對象</div>
           <select id="view-target" onchange="changeViewTarget()">
+            <option value="self">我自己</option>
+            <option value="all">全部員工</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs side -->
+    <div class="side-panel" id="sp-logs">
+      <div class="card">
+        <div class="card-title">📜 操作紀錄篩選</div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">開始日期</div>
+          <input type="date" id="log-from">
+        </div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">結束日期</div>
+          <input type="date" id="log-to">
+        </div>
+        <div class="fgroup" style="margin-bottom:10px">
+          <div class="flabel">操作類型</div>
+          <select id="log-action">
+            <option value="">全部</option>
+            <option value="login">登入/登出</option>
+            <option value="trip">行程操作</option>
+            <option value="etc">ETC 操作</option>
+            <option value="user">員工管理</option>
+            <option value="settings">設定變更</option>
+            <option value="tracking">追蹤控制</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" onclick="logToday()">今日</button>
+          <button class="btn btn-ghost btn-sm" onclick="logWeek()">近 7 天</button>
+          <button class="btn btn-ghost btn-sm" onclick="logMonth()">本月</button>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="loadLogs()">🔍 查詢</button>
+      </div>
+      <div class="card admin-only" style="display:none">
+        <div class="card-title">👁 查看對象</div>
+        <div class="fgroup">
+          <div class="flabel">範圍</div>
+          <select id="log-target">
             <option value="self">我自己</option>
             <option value="all">全部員工</option>
           </select>
@@ -678,6 +742,31 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         2. 系統會自動建立 Auth 帳號 + 員工資料<br>
         3. 把初始密碼告訴員工，請他到 OwnTracks App 設定對應的 Device ID<br>
         4. 員工首次登入需強制改密碼
+      </div>
+    </div>
+
+    <!-- 操作紀錄 main -->
+    <div id="main-logs" style="display:none">
+      <div class="tbar">
+        <div class="slabel">📜 操作紀錄</div>
+        <div style="flex:1"></div>
+        <div id="log-count" style="font-size:0.79rem;color:var(--muted)">—</div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr>
+            <th style="width:140px">時間</th>
+            <th style="width:90px">員工</th>
+            <th style="width:100px">操作類型</th>
+            <th>詳細內容</th>
+          </tr></thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+        <div class="empty" id="logs-empty" style="display:none"><div class="empty-i">📜</div><div>此範圍無操作紀錄</div></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:10px;line-height:1.6">
+        ℹ️ 操作紀錄會記錄：登入登出、新增/編輯/刪除行程、ETC 操作、設定變更、員工管理操作、追蹤控制等。<br>
+        員工只能看自己的紀錄；管理員可選查看自己或全部員工的紀錄。
       </div>
     </div>
 
@@ -892,14 +981,57 @@ async function doChangePassword() {
 
 async function doLogout() {
   if (!confirm('確定要登出嗎？')) return;
+  await writeLog('logout');
   await sb.auth.signOut();
   currentUser = null;
   location.reload();
 }
 
+// ── 修改密碼（自助） ─────────────────────────────────────────
+async function changeMyPassword() {
+  const current = document.getElementById('cp-current').value;
+  const newPwd = document.getElementById('cp-new').value;
+  const newPwd2 = document.getElementById('cp-new2').value;
+
+  if (!current) { toast('請輸入目前密碼', 'warn'); return; }
+  if (!newPwd || newPwd.length < 6) { toast('新密碼至少 6 字元', 'warn'); return; }
+  if (newPwd !== newPwd2) { toast('兩次新密碼不一致', 'warn'); return; }
+  if (newPwd === current) { toast('新密碼不能與目前密碼相同', 'warn'); return; }
+
+  try {
+    // 先用目前密碼驗證（重新登入一次）
+    const { error: signErr } = await sb.auth.signInWithPassword({
+      email: currentUser.email,
+      password: current,
+    });
+    if (signErr) { toast('目前密碼錯誤', 'err'); return; }
+
+    // 通過驗證才能改
+    const { error } = await sb.auth.updateUser({ password: newPwd });
+    if (error) throw error;
+
+    // 如果是首次強制改密碼模式，標記為已改
+    if (currentUser.must_change_password) {
+      await sb.from('users').update({ must_change_password: false }).eq('id', currentUser.id);
+      currentUser.must_change_password = false;
+    }
+
+    document.getElementById('cp-current').value = '';
+    document.getElementById('cp-new').value = '';
+    document.getElementById('cp-new2').value = '';
+    toast('密碼已更新');
+    await writeLog('password_changed');
+    alert('密碼更新成功！下次登入請使用新密碼。');
+  } catch (e) {
+    toast('更新失敗：' + e.message, 'err');
+  }
+}
+
 // ── App init（登入後） ─────────────────────────────────────────
 async function initApp() {
   showApp();
+  // 寫入登入紀錄
+  await writeLog('login', null, null, { email: currentUser.email });
   // 顯示使用者資訊
   document.getElementById('hdr-user-name').textContent = currentUser.name;
   document.getElementById('hdr-user-role').textContent = currentUser.role === 'admin' ? '管理員' : '員工';
@@ -963,7 +1095,7 @@ function gotoTab(tab) {
   // 非 admin 不能進入 admin 分頁
   if (tab === 'admin' && currentUser?.role !== 'admin') return;
   currentTab = tab;
-  const allTabs = ['track','trips','etc','admin','settings','export'];
+  const allTabs = ['track','trips','etc','admin','logs','settings','export'];
   // 更新 tab 樣式
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
   const tabEls = document.querySelectorAll('.tab');
@@ -979,6 +1111,7 @@ function gotoTab(tab) {
   if (tab === 'trips') loadTrips();
   if (tab === 'etc') loadEtc();
   if (tab === 'admin') loadAllUsers();
+  if (tab === 'logs') loadLogs();
   if (tab === 'export') previewExport();
 }
 
@@ -1012,6 +1145,7 @@ async function processTrips() {
         result.style.color = 'var(--green)';
         result.textContent = `✓ 找到 ${data.trips_found} 筆行程，已儲存 ${data.trips_saved} 筆（分析 ${data.processed} 個座標）`;
         toast(`成功新增 ${data.trips_saved} 筆行程！`);
+        await writeLog('trip_process', null, null, { found: data.trips_found, saved: data.trips_saved, processed: data.processed });
         await loadTrips();
         updateHeaderStats();
       } else {
@@ -1105,6 +1239,7 @@ async function startTracking() {
   toast('開始記錄！OwnTracks 已切換為高頻模式');
   localStorage.setItem('tracking_' + currentUser.id, JSON.stringify({ start: trackStart.toISOString() }));
   await checkLastLocation();
+  await writeLog('tracking_start', null, null, { mode: 'Move' });
 }
 
 async function stopTracking() {
@@ -1122,6 +1257,8 @@ async function stopTracking() {
   await setTrackingMode(1);
   toast('記錄已停止，OwnTracks 切換回省電模式');
   localStorage.removeItem('tracking_' + currentUser.id);
+  const duration = trackStart ? Math.round((Date.now() - trackStart.getTime()) / 60000) : 0;
+  await writeLog('tracking_stop', null, null, { duration_min: duration });
 }
 
 function updateTrackTime() {
@@ -1205,6 +1342,7 @@ async function saveSettings() {
     await sb.from('companies').update(compUpdate).eq('id', currentUser.company_id);
   }
   toast('設定已儲存');
+  await writeLog('settings_save', null, null, { fuel_rate: userUpdate.fuel_rate, etc_limit: userUpdate.etc_limit });
 }
 
 // ── Reverse Geocode ──────────────────────────────────────────
@@ -1403,6 +1541,7 @@ async function addTrip() {
   const { error } = await sb.from('trips').insert(d);
   if (error) { toast('新增失敗：' + error.message, 'err'); return; }
   toast('行程已新增！');
+  await writeLog('trip_add', 'trip', null, { date: d.date, origin: d.origin, destination: d.destination, km: d.distance_km });
   clearForm();
   await loadTrips();
 }
@@ -1448,13 +1587,18 @@ async function saveEdit() {
   };
   d.fuel_subsidy = Math.round(d.distance_km * d.fuel_rate);
   await sb.from('trips').update(d).eq('id', id);
-  closeModal(); toast('已更新！'); await loadTrips();
+  closeModal(); toast('已更新！');
+  await writeLog('trip_edit', 'trip', id, { date: d.date, origin: d.origin, destination: d.destination, km: d.distance_km });
+  await loadTrips();
 }
 
 async function delTrip(id) {
   if (!confirm('確定刪除此行程？')) return;
+  const trip = allTrips.find(t => t.id === id);
   await sb.from('trips').delete().eq('id', id);
-  toast('已刪除'); await loadTrips();
+  toast('已刪除');
+  await writeLog('trip_delete', 'trip', id, trip ? { date: trip.date, origin: trip.origin, destination: trip.destination } : null);
+  await loadTrips();
 }
 
 function closeModal() { document.getElementById('edit-modal').classList.remove('on'); }
@@ -1513,6 +1657,7 @@ async function addEtc() {
   const { error } = await sb.from('etc_records').insert(d);
   if (error) { toast('新增失敗', 'err'); return; }
   toast('ETC 已新增！');
+  await writeLog('etc_add', 'etc', null, { amount: amt, highway: d.highway });
   document.getElementById('etc-amt').value = '';
   document.getElementById('etc-time').value = '';
   document.getElementById('etc-highway').value = '';
@@ -1522,8 +1667,11 @@ async function addEtc() {
 
 async function delEtc(id) {
   if (!confirm('確定刪除此 ETC 記錄？')) return;
+  const etc = allEtc.find(e => e.id === id);
   await sb.from('etc_records').delete().eq('id', id);
-  toast('已刪除'); await loadEtc();
+  toast('已刪除');
+  await writeLog('etc_delete', 'etc', id, etc ? { amount: etc.amount } : null);
+  await loadEtc();
 }
 
 // ── Filter helpers ───────────────────────────────────────────
@@ -1652,6 +1800,7 @@ async function exportExcel() {
   a.href = url; a.download = `出差記錄${suffix}_${from}_${to}.csv`; a.click();
   URL.revokeObjectURL(url);
   toast('Excel 已下載！');
+  await writeLog('export', null, null, { from, to, count: trips.length, scope: showUser ? 'all' : 'self' });
 }
 
 // ── Utils ────────────────────────────────────────────────────
@@ -1793,6 +1942,7 @@ async function saveUser() {
       const { error } = await sb.from('users').update(updateData).eq('id', parseInt(editId));
       if (error) throw error;
       toast('員工資料已更新');
+      await writeLog('user_edit', 'user', editId, { name, email, role });
       closeUserModal();
       await loadAllUsers();
     } else {
@@ -1826,6 +1976,7 @@ async function saveUser() {
       if (!data.ok) throw new Error(data.error || '建立失敗');
 
       toast(`員工「${name}」建立成功！`);
+      await writeLog('user_create', 'user', null, { name, email, role, device_id: device });
       alert(`員工建立成功！\n\n姓名：${name}\nEmail：${email}\n初始密碼：${password}\n\n請告知員工此密碼，首次登入後系統會要求修改。`);
       closeUserModal();
       await loadAllUsers();
@@ -1846,6 +1997,7 @@ async function toggleUserActive(userId) {
   if (!confirm(`確定${action}員工「${u.name}」？`)) return;
   await sb.from('users').update({ active: !u.active }).eq('id', userId);
   toast(`已${action}員工「${u.name}」`);
+  await writeLog('user_toggle_active', 'user', userId, { name: u.name, new_active: !u.active });
   await loadAllUsers();
 }
 
@@ -1878,6 +2030,7 @@ async function resetUserPassword(userId) {
     if (!data.ok) throw new Error(data.error || '失敗');
 
     toast(`已重設「${u.name}」的密碼`);
+    await writeLog('user_reset_password', 'user', userId, { name: u.name });
     alert(`密碼重設成功！\n\n員工：${u.name}\n新密碼：${newPwd}\n\n請告知員工此密碼，下次登入後系統會要求修改。`);
     await loadAllUsers();
   } catch (e) {
@@ -1917,6 +2070,7 @@ async function deleteUser(userId) {
     if (!data.ok) throw new Error(data.error || '失敗');
 
     toast(`已永久刪除員工「${u.name}」`);
+    await writeLog('user_delete', 'user', userId, { name: u.name, email: u.email });
     await loadAllUsers();
   } catch (e) {
     toast('失敗：' + e.message, 'err');
@@ -1927,6 +2081,121 @@ async function deleteUser(userId) {
 function esc(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ════════════════════════════════════════════════════════════
+// ─── 操作紀錄系統（system_logs） ─────────────────────────────
+// ════════════════════════════════════════════════════════════
+
+// 寫入一筆操作紀錄
+async function writeLog(action, targetType = null, targetId = null, detail = null) {
+  if (!currentUser) return;
+  try {
+    await sb.from('system_logs').insert({
+      user_id: currentUser.id,
+      action,
+      target_type: targetType,
+      target_id: targetId ? parseInt(targetId) : null,
+      detail: detail || null,
+    });
+  } catch (e) {
+    console.error('writeLog failed:', e);
+  }
+}
+
+// 載入操作紀錄
+async function loadLogs() {
+  if (!currentUser) return;
+  const from = document.getElementById('log-from')?.value;
+  const to = document.getElementById('log-to')?.value;
+  const actionFilter = document.getElementById('log-action')?.value;
+  const targetEl = document.getElementById('log-target');
+  const logTarget = targetEl ? targetEl.value : 'self';
+
+  let q = sb.from('system_logs').select('*, users(name)').order('created_at', { ascending: false }).limit(500);
+
+  if (currentUser.role !== 'admin' || logTarget === 'self') {
+    q = q.eq('user_id', currentUser.id);
+  }
+  if (from) q = q.gte('created_at', from + 'T00:00:00');
+  if (to) q = q.lte('created_at', to + 'T23:59:59');
+  if (actionFilter) q = q.ilike('action', actionFilter + '%');
+
+  const { data, error } = await q;
+  if (error) {
+    console.error(error);
+    toast('載入紀錄失敗', 'err');
+    return;
+  }
+
+  const logs = data || [];
+  document.getElementById('log-count').textContent = `共 ${logs.length} 筆`;
+  const tbody = document.getElementById('logs-body');
+  const empty = document.getElementById('logs-empty');
+  if (!logs.length) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = logs.map(log => {
+    const time = new Date(log.created_at);
+    const timeStr = time.toLocaleString('zh-TW', { hour12: false }).replace(/\//g, '-');
+    const actionLabel = LOG_LABELS[log.action] || log.action;
+    const detailStr = log.detail ? (typeof log.detail === 'object' ? JSON.stringify(log.detail, null, 0) : log.detail) : '';
+    return `<tr>
+      <td style="font-family:monospace;font-size:0.79rem;color:var(--muted);white-space:nowrap">${timeStr}</td>
+      <td style="font-size:0.86rem">${esc(log.users?.name || '—')}</td>
+      <td><span style="padding:2px 8px;border-radius:4px;background:rgba(0,212,255,.1);color:var(--accent);font-size:0.72rem;white-space:nowrap">${actionLabel}</span></td>
+      <td style="font-size:0.86rem">${esc(detailStr)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// 操作類型中文標籤
+const LOG_LABELS = {
+  'login': '登入',
+  'logout': '登出',
+  'password_changed': '改密碼',
+  'tracking_start': '開始記錄',
+  'tracking_stop': '停止記錄',
+  'trip_add': '新增行程',
+  'trip_edit': '編輯行程',
+  'trip_delete': '刪除行程',
+  'trip_process': '處理新行程',
+  'etc_add': '新增 ETC',
+  'etc_delete': '刪除 ETC',
+  'settings_save': '儲存設定',
+  'user_create': '新增員工',
+  'user_edit': '編輯員工',
+  'user_delete': '刪除員工',
+  'user_reset_password': '重設員工密碼',
+  'user_toggle_active': '啟用/停用員工',
+  'export': '匯出報表',
+  'geocode': '查詢地址',
+};
+
+// 日期快速選擇
+function logToday() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('log-from').value = today;
+  document.getElementById('log-to').value = today;
+  loadLogs();
+}
+function logWeek() {
+  const today = new Date();
+  const weekAgo = new Date(today.getTime() - 6 * 86400000);
+  document.getElementById('log-from').value = weekAgo.toISOString().slice(0, 10);
+  document.getElementById('log-to').value = today.toISOString().slice(0, 10);
+  loadLogs();
+}
+function logMonth() {
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  document.getElementById('log-from').value = firstDay.toISOString().slice(0, 10);
+  document.getElementById('log-to').value = today.toISOString().slice(0, 10);
+  loadLogs();
 }
 </script>
 </body>
