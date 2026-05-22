@@ -320,10 +320,21 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
           </div>
         </div>
         <div class="track-time" id="track-time" style="display:none">00:00:00</div>
-        <div style="display:flex;gap:6px;margin-bottom:8px;font-size:0.72rem">
+        <div style="display:flex;gap:6px;margin-bottom:8px;font-size:0.72rem;flex-wrap:wrap;align-items:center">
           <span style="padding:2px 8px;border-radius:4px;background:rgba(0,229,160,.1);color:var(--green)" id="mode-badge">● Significant（省電）</span>
+          <span style="font-size:0.72rem;color:var(--muted)" id="last-ping">最後座標：—</span>
         </div>
         <button class="track-btn start" id="track-btn" onclick="toggleTracking()">▶ 開始記錄</button>
+      </div>
+
+      <!-- 初始化模式提醒（OwnTracks 在 Quiet 時顯示） -->
+      <div id="quiet-warn" style="display:none;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.25);border-radius:10px;padding:12px;margin-top:10px">
+        <div style="font-size:0.86rem;font-weight:600;color:var(--amber);margin-bottom:6px">⚠️ OwnTracks 可能在 Quiet 模式</div>
+        <div style="font-size:0.79rem;color:var(--muted);line-height:1.6;margin-bottom:10px">
+          5 分鐘內沒收到座標。OwnTracks 在 Quiet 模式時不會送座標，按下「開始記錄」也無法自動切換到 Move 模式。<br><br>
+          <strong style="color:var(--text)">解決方法：</strong>打開 OwnTracks App，點右上角「↑」按鈕，強制送一次座標，系統才能下指令切換模式。
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="checkLastLocation()" style="color:var(--amber);border-color:rgba(255,176,32,.3)">🔄 重新檢查</button>
       </div>
 
       <!-- 預約啟動 -->
@@ -660,6 +671,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadTrips();
   await loadEtc();
   updateHeaderStats();
+  await checkLastLocation();
+  // 每 30 秒自動更新最後座標時間
+  setInterval(checkLastLocation, 30000);
 });
 
 function setDefaultDates() {
@@ -733,6 +747,43 @@ async function processTrips() {
   status.textContent = '完成 ' + new Date().toLocaleTimeString('zh-TW', { hour12: false });
 }
 
+// ── Check OwnTracks last ping ────────────────────────────────
+async function checkLastLocation() {
+  const lastEl = document.getElementById('last-ping');
+  const warnEl = document.getElementById('quiet-warn');
+  try {
+    const { data } = await sb
+      .from('locations')
+      .select('recorded_at')
+      .order('recorded_at', { ascending: false })
+      .limit(1);
+    if (!data || !data.length) {
+      lastEl.textContent = '最後座標：尚無';
+      warnEl.style.display = '';
+      return;
+    }
+    const last = new Date(data[0].recorded_at);
+    const diffMin = Math.round((Date.now() - last.getTime()) / 60000);
+    let label;
+    if (diffMin < 1) label = '剛剛';
+    else if (diffMin < 60) label = `${diffMin} 分鐘前`;
+    else if (diffMin < 1440) label = `${Math.floor(diffMin / 60)} 小時前`;
+    else label = `${Math.floor(diffMin / 1440)} 天前`;
+
+    lastEl.textContent = `最後座標：${label}`;
+    // 超過 5 分鐘且不在記錄中時顯示警告
+    if (diffMin > 5 && !tracking) {
+      warnEl.style.display = '';
+      lastEl.style.color = 'var(--amber)';
+    } else {
+      warnEl.style.display = 'none';
+      lastEl.style.color = 'var(--muted)';
+    }
+  } catch (e) {
+    console.error('checkLastLocation failed', e);
+  }
+}
+
 // ── Tracking control ─────────────────────────────────────────
 function toggleTracking() {
   if (!tracking) startTracking();
@@ -764,6 +815,7 @@ async function startTracking() {
   await setTrackingMode(2);
   toast('開始記錄！OwnTracks 已切換為高頻模式');
   localStorage.setItem('tracking', JSON.stringify({ start: trackStart.toISOString() }));
+  await checkLastLocation();
 }
 
 async function stopTracking() {
