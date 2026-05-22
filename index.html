@@ -1701,8 +1701,14 @@ function renderAdminUsers() {
         ? '<span style="color:var(--green)">●啟用</span>'
         : '<span style="color:var(--muted)">○停用</span>'}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="openEditUser(${u.id})">編輯</button>
-        ${u.id !== currentUser.id ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive(${u.id})">${u.active ? '停用' : '啟用'}</button>` : ''}
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="openEditUser(${u.id})" title="編輯資料">✏️ 編輯</button>
+          ${u.id !== currentUser.id ? `
+            <button class="btn btn-ghost btn-sm" onclick="resetUserPassword(${u.id})" title="重設密碼" style="color:var(--amber)">🔑 重設密碼</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleUserActive(${u.id})" title="${u.active ? '停用帳號' : '啟用帳號'}">${u.active ? '⏸ 停用' : '▶ 啟用'}</button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteUser(${u.id})" title="永久刪除" style="color:var(--red)">🗑 刪除</button>
+          ` : '<span style="font-size:0.72rem;color:var(--muted)">（自己）</span>'}
+        </div>
       </td>
     </tr>
   `).join('');
@@ -1836,6 +1842,80 @@ async function toggleUserActive(userId) {
   await sb.from('users').update({ active: !u.active }).eq('id', userId);
   toast(`已${action}員工「${u.name}」`);
   await loadAllUsers();
+}
+
+// ── 重設員工密碼 ──────────────────────────────────────────────
+async function resetUserPassword(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+  if (u.id === currentUser.id) { toast('不能重設自己的密碼，請用「忘記密碼」', 'warn'); return; }
+
+  const newPwd = prompt(`重設員工「${u.name}」的密碼\n請輸入新密碼（至少 6 字元）：`, 'password123');
+  if (newPwd === null) return; // 取消
+  if (!newPwd || newPwd.length < 6) { toast('密碼至少 6 字元', 'warn'); return; }
+
+  if (!confirm(`確定要把員工「${u.name}」的密碼重設為：\n\n${newPwd}\n\n員工下次登入後會被要求重新設定密碼。`)) return;
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/reset-password`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_user_id: currentUser.id,
+          target_user_id: userId,
+          new_password: newPwd,
+        })
+      }
+    );
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '失敗');
+
+    toast(`已重設「${u.name}」的密碼`);
+    alert(`密碼重設成功！\n\n員工：${u.name}\n新密碼：${newPwd}\n\n請告知員工此密碼，下次登入後系統會要求修改。`);
+    await loadAllUsers();
+  } catch (e) {
+    toast('失敗：' + e.message, 'err');
+  }
+}
+
+// ── 刪除員工（永久刪除） ──────────────────────────────────────
+async function deleteUser(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+  if (u.id === currentUser.id) { toast('不能刪除自己', 'warn'); return; }
+
+  // 雙重確認
+  if (!confirm(`⚠️ 警告：永久刪除員工「${u.name}」\n\n將會一併刪除：\n• 員工帳號（無法登入）\n• 所有座標記錄\n• 所有行程記錄\n• 所有 ETC 記錄\n• 所有操作紀錄\n\n此動作無法復原！確定要繼續嗎？`)) return;
+
+  // 第二次確認，要輸入員工姓名
+  const confirmName = prompt(`為確認刪除，請輸入員工姓名：「${u.name}」`);
+  if (confirmName !== u.name) {
+    if (confirmName !== null) toast('姓名不符，取消刪除', 'warn');
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/delete-user`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_user_id: currentUser.id,
+          target_user_id: userId,
+        })
+      }
+    );
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '失敗');
+
+    toast(`已永久刪除員工「${u.name}」`);
+    await loadAllUsers();
+  } catch (e) {
+    toast('失敗：' + e.message, 'err');
+  }
 }
 
 // 工具函式
