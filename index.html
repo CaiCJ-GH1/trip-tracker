@@ -1769,7 +1769,7 @@ async function saveUser() {
 
   try {
     if (editId) {
-      // 編輯
+      // 編輯既有員工
       const updateData = {
         name, email, role,
         department: dept || null,
@@ -1782,44 +1782,43 @@ async function saveUser() {
       const { error } = await sb.from('users').update(updateData).eq('id', parseInt(editId));
       if (error) throw error;
       toast('員工資料已更新');
+      closeUserModal();
+      await loadAllUsers();
     } else {
-      // 新增：必須先建立 Auth 帳號（公開 API 沒辦法做，必須用 Service Role）
-      // 這裡先建立 users 表，並提示管理員手動建立 Auth
-      if (!password || password.length < 6) { toast('密碼至少 6 字元', 'warn'); btn.disabled = false; btn.textContent = '建立'; return; }
+      // 新增員工：呼叫 create-user Edge Function
+      if (!password || password.length < 6) {
+        toast('密碼至少 6 字元', 'warn');
+        btn.disabled = false;
+        btn.textContent = '建立';
+        return;
+      }
 
-      // 嘗試用 signUp 註冊（會發送驗證信，或自動建立）
-      const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
-        email, password,
-        options: { data: { name } }
-      });
-      if (signUpErr) throw signUpErr;
-      if (!signUpData?.user?.id) throw new Error('Auth 帳號建立失敗');
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            admin_user_id: currentUser.id,
+            company_id: currentUser.company_id,
+            email, password, name, role,
+            department: dept,
+            device_id: device,
+            tracker_id: tracker,
+            fuel_rate: fuel,
+            etc_limit: etclimit,
+          })
+        }
+      );
 
-      // 建立 users 表記錄
-      const insertData = {
-        company_id: currentUser.company_id,
-        auth_user_id: signUpData.user.id,
-        email, name, role,
-        department: dept || null,
-        device_id: device,
-        tracker_id: tracker || null,
-        fuel_rate: fuel,
-        etc_limit: etclimit,
-        active: true,
-        must_change_password: true,
-      };
-      const { error: insErr } = await sb.from('users').insert(insertData);
-      if (insErr) throw insErr;
-      toast(`員工建立成功！初始密碼：${password}`);
-      // 重要：signUp 會把目前 session 切換成新建立的使用者
-      // 需要重新登入回 admin
-      alert(`員工建立完成！\n\n初始密碼：${password}\n\n請告知員工此密碼，首次登入後系統會要求修改。\n\n按確定後系統會重新登入。`);
-      // 重新登入回 admin
-      location.reload();
-      return;
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || '建立失敗');
+
+      toast(`員工「${name}」建立成功！`);
+      alert(`員工建立成功！\n\n姓名：${name}\nEmail：${email}\n初始密碼：${password}\n\n請告知員工此密碼，首次登入後系統會要求修改。`);
+      closeUserModal();
+      await loadAllUsers();
     }
-    closeUserModal();
-    await loadAllUsers();
   } catch (e) {
     toast('失敗：' + e.message, 'err');
     console.error(e);
