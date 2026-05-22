@@ -708,6 +708,44 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
           </div>
         </div>
         <div class="setting-group">
+          <div class="setting-title">🔋 充電自動觸發</div>
+          <div style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            插上車充時，系統可自動開始記錄。
+            <span id="battery-support" style="color:var(--green);font-weight:600">　偵測支援中…</span>
+          </div>
+          <div class="fgroup" style="margin-bottom:12px">
+            <div class="flabel">充電時動作</div>
+            <select id="s-charge-trigger">
+              <option value="off">關閉（手動按開始）</option>
+              <option value="ask">充電時詢問是否開始</option>
+              <option value="auto">充電時直接開始</option>
+            </select>
+          </div>
+          <div class="fgroup" style="margin-bottom:8px">
+            <div class="flabel">拔掉充電時動作</div>
+            <select id="s-charge-unplug">
+              <option value="ask">詢問是否停止</option>
+              <option value="auto">直接停止</option>
+              <option value="none">不處理（手動按停止）</option>
+            </select>
+          </div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.7">
+            • 需要保持瀏覽器開著（前景或背景皆可）<br>
+            • iOS Safari 不支援，請用 Android Chrome<br>
+            • 螢幕關閉時偵測可能延遲
+          </div>
+          <div id="charge-status" style="margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:0.86rem;display:none">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="charge-icon" style="font-size:1.2rem">🔌</span>
+              <div>
+                <div id="charge-text" style="font-weight:600">—</div>
+                <div id="charge-detail" style="font-size:0.72rem;color:var(--muted);margin-top:2px">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
           <div class="setting-title">OwnTracks Webhook 網址</div>
           <div class="code-block" id="webhook-url" style="font-size:12px">載入中...</div>
           <div style="font-size:11px;color:var(--muted);margin-top:6px">複製此網址貼到 OwnTracks App 的 HTTP 端點設定</div>
@@ -1077,6 +1115,9 @@ async function initApp() {
   if (currentUser.role === 'admin') {
     await loadAllUsers();
   }
+
+  // 初始化充電偵測
+  await initBatteryMonitor();
 }
 
 function setDefaultDates() {
@@ -1299,6 +1340,8 @@ async function loadCurrentSettings() {
   document.getElementById('s-etclimit').value = currentUser.etc_limit || 0;
   document.getElementById('s-upload').value = currentUser.upload_mode || 'wifi';
   document.getElementById('f-rate').value = currentUser.fuel_rate || 4;
+  document.getElementById('s-charge-trigger').value = currentUser.charge_trigger_mode || 'off';
+  document.getElementById('s-charge-unplug').value = currentUser.charge_unplug_mode || 'ask';
   // 公司資訊由 admin 在公司設定，員工只看不改
   const { data: comp } = await sb.from('companies').select('*').eq('id', currentUser.company_id).single();
   if (comp) {
@@ -1318,16 +1361,20 @@ async function loadCurrentSettings() {
 }
 
 async function saveSettings() {
-  // 個人設定：fuel_rate, etc_limit, upload_mode
+  // 個人設定：fuel_rate, etc_limit, upload_mode, charge_*
   const userUpdate = {
     fuel_rate: parseFloat(document.getElementById('s-rate').value) || 4,
     etc_limit: parseInt(document.getElementById('s-etclimit').value) || 0,
     upload_mode: document.getElementById('s-upload').value,
+    charge_trigger_mode: document.getElementById('s-charge-trigger').value,
+    charge_unplug_mode: document.getElementById('s-charge-unplug').value,
     updated_at: new Date().toISOString(),
   };
   await sb.from('users').update(userUpdate).eq('id', currentUser.id);
   Object.assign(currentUser, userUpdate);
   document.getElementById('f-rate').value = userUpdate.fuel_rate;
+  // 重新初始化充電偵測（設定變更時）
+  await initBatteryMonitor();
 
   // 公司設定：只有 admin 能改
   if (currentUser.role === 'admin') {
@@ -2196,6 +2243,192 @@ function logMonth() {
   document.getElementById('log-from').value = firstDay.toISOString().slice(0, 10);
   document.getElementById('log-to').value = today.toISOString().slice(0, 10);
   loadLogs();
+}
+
+// ════════════════════════════════════════════════════════════
+// ─── 充電自動觸發（Battery API） ─────────────────────────────
+// ════════════════════════════════════════════════════════════
+
+let batteryRef = null;             // BatteryManager 參考
+let lastChargingState = null;      // 上一次的充電狀態
+let chargeDebounce = null;         // 防抖計時器（避免閃斷）
+
+async function initBatteryMonitor() {
+  const supportEl = document.getElementById('battery-support');
+  const statusEl = document.getElementById('charge-status');
+
+  // 檢查瀏覽器支援
+  if (!('getBattery' in navigator)) {
+    if (supportEl) {
+      supportEl.textContent = '　❌ 此瀏覽器不支援';
+      supportEl.style.color = 'var(--red)';
+    }
+    if (statusEl) statusEl.style.display = 'none';
+    return;
+  }
+
+  try {
+    if (!batteryRef) {
+      batteryRef = await navigator.getBattery();
+      // 註冊事件：充電狀態變化
+      batteryRef.addEventListener('chargingchange', onChargingChange);
+    }
+    if (supportEl) {
+      supportEl.textContent = '　✅ 已啟用偵測';
+      supportEl.style.color = 'var(--green)';
+    }
+    // 顯示目前狀態
+    updateChargeStatus();
+    lastChargingState = batteryRef.charging;
+  } catch (e) {
+    console.error('Battery API failed:', e);
+    if (supportEl) {
+      supportEl.textContent = '　❌ 偵測失敗';
+      supportEl.style.color = 'var(--red)';
+    }
+  }
+}
+
+function updateChargeStatus() {
+  if (!batteryRef) return;
+  const statusEl = document.getElementById('charge-status');
+  const iconEl = document.getElementById('charge-icon');
+  const textEl = document.getElementById('charge-text');
+  const detailEl = document.getElementById('charge-detail');
+  if (!statusEl) return;
+
+  statusEl.style.display = '';
+  const level = Math.round(batteryRef.level * 100);
+  if (batteryRef.charging) {
+    iconEl.textContent = '⚡';
+    textEl.textContent = `充電中（${level}%）`;
+    textEl.style.color = 'var(--green)';
+    const t = batteryRef.chargingTime;
+    detailEl.textContent = (t > 0 && t < Infinity)
+      ? `預計 ${Math.round(t / 60)} 分鐘充滿`
+      : '已連接電源';
+  } else {
+    iconEl.textContent = '🔋';
+    textEl.textContent = `使用電池（${level}%）`;
+    textEl.style.color = 'var(--text)';
+    const t = batteryRef.dischargingTime;
+    detailEl.textContent = (t > 0 && t < Infinity)
+      ? `預計可用 ${Math.round(t / 60)} 分鐘`
+      : '未連接電源';
+  }
+}
+
+async function onChargingChange() {
+  if (!batteryRef || !currentUser) return;
+  updateChargeStatus();
+
+  const isCharging = batteryRef.charging;
+  // 第一次觸發時 lastChargingState 還沒設定
+  if (lastChargingState === null) {
+    lastChargingState = isCharging;
+    return;
+  }
+  // 沒變化就忽略
+  if (lastChargingState === isCharging) return;
+
+  // 防抖（避免閃斷）：等 3 秒確認狀態真的改變
+  if (chargeDebounce) clearTimeout(chargeDebounce);
+  chargeDebounce = setTimeout(async () => {
+    // 再次確認狀態（可能在 3 秒內又變回來）
+    if (batteryRef.charging !== isCharging) return;
+    lastChargingState = isCharging;
+
+    if (isCharging) {
+      await handleChargeStart();
+    } else {
+      await handleChargeEnd();
+    }
+  }, 3000);
+}
+
+async function handleChargeStart() {
+  const mode = currentUser.charge_trigger_mode || 'off';
+  if (mode === 'off') return;
+  if (tracking) return; // 已經在記錄就不做事
+
+  await writeLog('charge_detected', null, null, { event: 'plug_in' });
+
+  if (mode === 'auto') {
+    // 直接開始記錄
+    toast('⚡ 偵測到充電，自動開始記錄', 'ok');
+    await startTracking();
+  } else if (mode === 'ask') {
+    // 詢問
+    showChargeNotification(
+      '⚡ 偵測到充電',
+      '要開始記錄行程嗎？',
+      async () => { await startTracking(); },
+      null
+    );
+  }
+}
+
+async function handleChargeEnd() {
+  const mode = currentUser.charge_unplug_mode || 'ask';
+  if (mode === 'none') return;
+  if (!tracking) return; // 沒在記錄就不做事
+
+  await writeLog('charge_detected', null, null, { event: 'unplug' });
+
+  if (mode === 'auto') {
+    toast('🔌 偵測到拔掉充電，自動停止記錄', 'ok');
+    await stopTracking();
+  } else if (mode === 'ask') {
+    showChargeNotification(
+      '🔌 充電已停止',
+      '要結束記錄行程嗎？',
+      async () => { await stopTracking(); },
+      null
+    );
+  }
+}
+
+// 顯示充電通知（畫面右上角浮動視窗）
+function showChargeNotification(title, message, onConfirm, onCancel) {
+  // 移除之前的通知
+  const old = document.getElementById('charge-notify');
+  if (old) old.remove();
+
+  const div = document.createElement('div');
+  div.id = 'charge-notify';
+  div.style.cssText = `
+    position:fixed;top:20px;right:20px;z-index:9500;
+    background:var(--card);border:2px solid var(--accent);border-radius:12px;
+    padding:16px 18px;box-shadow:0 8px 32px rgba(0,212,255,.25);
+    max-width:320px;min-width:260px;
+    animation:slideIn 0.3s ease-out;
+  `;
+  div.innerHTML = `
+    <div style="font-size:1.07rem;font-weight:700;color:var(--accent);margin-bottom:6px">${title}</div>
+    <div style="font-size:0.93rem;color:var(--text);margin-bottom:14px">${message}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" id="charge-notify-cancel">取消</button>
+      <button class="btn btn-primary btn-sm" id="charge-notify-ok">確定</button>
+    </div>
+  `;
+  document.body.appendChild(div);
+
+  // 也用瀏覽器原生通知（如果有權限）
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body: message, icon: '🚗' });
+  }
+
+  document.getElementById('charge-notify-ok').onclick = async () => {
+    div.remove();
+    if (onConfirm) await onConfirm();
+  };
+  document.getElementById('charge-notify-cancel').onclick = () => {
+    div.remove();
+    if (onCancel) onCancel();
+  };
+
+  // 60 秒後自動關閉
+  setTimeout(() => div.remove(), 60000);
 }
 </script>
 </body>
