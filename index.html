@@ -380,6 +380,7 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         <div class="track-time" id="track-time" style="display:none">00:00:00</div>
         <div style="display:flex;gap:6px;margin-bottom:8px;font-size:0.72rem;flex-wrap:wrap;align-items:center">
           <span style="padding:2px 8px;border-radius:4px;background:rgba(0,229,160,.1);color:var(--green)" id="mode-badge">● Significant（省電）</span>
+          <span style="padding:2px 8px;border-radius:4px;background:rgba(0,212,255,.1);color:var(--accent);display:none" id="wakelock-badge">📱 螢幕常亮中</span>
           <span style="font-size:0.72rem;color:var(--muted)" id="last-ping">最後座標：—</span>
         </div>
         <button class="track-btn start" id="track-btn" onclick="toggleTracking()">▶ 開始記錄</button>
@@ -746,6 +747,27 @@ td{padding:10px 12px;font-size:0.86rem;vertical-align:middle}
         </div>
 
         <div class="setting-group">
+          <div class="setting-title">📱 螢幕設定</div>
+          <div style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            記錄期間防止螢幕自動熄滅，避免影響充電偵測和自動停止判斷。
+            <span id="wakelock-support" style="color:var(--green);font-weight:600">　偵測支援中…</span>
+          </div>
+          <div class="fgroup" style="margin-bottom:8px">
+            <div class="flabel">記錄中保持螢幕常亮</div>
+            <select id="s-keepscreen">
+              <option value="true">啟用（推薦）</option>
+              <option value="false">關閉</option>
+            </select>
+          </div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.7">
+            • 只在按下「開始記錄」後生效，停止後恢復正常<br>
+            • 切換到其他 App 時會自動釋放，回到網頁會自動重新啟用<br>
+            • 按電源鍵強制關螢幕仍會生效（不影響）<br>
+            • 此功能需要 Chrome 84+ 或 Edge 84+
+          </div>
+        </div>
+
+        <div class="setting-group">
           <div class="setting-title">🚗 自動停止記錄</div>
           <div style="font-size:0.79rem;color:var(--muted);margin-bottom:12px;line-height:1.6">
             記錄中如長時間沒移動（例如忘記按停止），自動詢問是否停止。
@@ -1064,6 +1086,7 @@ async function doChangePassword() {
 async function doLogout() {
   if (!confirm('確定要登出嗎？')) return;
   await writeLog('logout');
+  await releaseWakeLock();
   await sb.auth.signOut();
   currentUser = null;
   location.reload();
@@ -1162,8 +1185,15 @@ async function initApp() {
 
   // 初始化充電偵測
   await initBatteryMonitor();
-  // 如果恢復了追蹤狀態，啟動自動停止監測
-  if (tracking) startAutoStopMonitor();
+  // 檢查 Wake Lock 支援狀態
+  checkWakeLockSupport();
+  // 如果恢復了追蹤狀態，啟動自動停止監測 + 申請 wake lock
+  if (tracking) {
+    startAutoStopMonitor();
+    if (currentUser.keep_screen_on !== false) {
+      await requestWakeLock();
+    }
+  }
 }
 
 function setDefaultDates() {
@@ -1329,6 +1359,10 @@ async function startTracking() {
   await writeLog('tracking_start', null, null, { mode: 'Move' });
   // 啟動自動停止監測（如果有開啟）
   startAutoStopMonitor();
+  // 申請螢幕喚醒鎖（如果有設定）
+  if (currentUser.keep_screen_on !== false) {
+    await requestWakeLock();
+  }
 }
 
 async function stopTracking() {
@@ -1350,6 +1384,8 @@ async function stopTracking() {
   await writeLog('tracking_stop', null, null, { duration_min: duration });
   // 停止自動停止監測
   stopAutoStopMonitor();
+  // 釋放螢幕喚醒鎖
+  await releaseWakeLock();
 }
 
 function updateTrackTime() {
@@ -1397,6 +1433,7 @@ async function loadCurrentSettings() {
   document.getElementById('s-autostop-method').value = currentUser.auto_stop_method || 'speed';
   document.getElementById('s-autostop-speed').value = currentUser.auto_stop_speed ?? 5;
   document.getElementById('s-autostop-distance').value = currentUser.auto_stop_distance || 100;
+  document.getElementById('s-keepscreen').value = currentUser.keep_screen_on === false ? 'false' : 'true';
   // 控制細項顯示
   document.getElementById('autostop-options').style.display =
     currentUser.auto_stop_enabled ? '' : 'none';
@@ -1435,6 +1472,7 @@ async function saveSettings() {
     auto_stop_method: document.getElementById('s-autostop-method').value,
     auto_stop_speed: parseFloat(document.getElementById('s-autostop-speed').value) || 5,
     auto_stop_distance: parseInt(document.getElementById('s-autostop-distance').value) || 100,
+    keep_screen_on: document.getElementById('s-keepscreen').value === 'true',
     updated_at: new Date().toISOString(),
   };
   await sb.from('users').update(userUpdate).eq('id', currentUser.id);
@@ -2498,7 +2536,75 @@ function showChargeNotification(title, message, onConfirm, onCancel) {
     if (onCancel) onCancel();
   };
 
-  // 60 秒後自動關閉
+  // ════════════════════════════════════════════════════════════
+// ─── Screen Wake Lock（記錄中防止螢幕熄滅） ──────────────────
+// ════════════════════════════════════════════════════════════
+
+let wakeLock = null;  // WakeLockSentinel 參考
+let wakeLockActive = false; // 是否「應該」保持喚醒（記錄中且設定啟用）
+
+// 檢查支援狀態並顯示
+function checkWakeLockSupport() {
+  const el = document.getElementById('wakelock-support');
+  if (!el) return;
+  if ('wakeLock' in navigator) {
+    el.textContent = '　✅ 已支援';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = '　❌ 此瀏覽器不支援';
+    el.style.color = 'var(--red)';
+  }
+}
+
+// 啟用 Wake Lock
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return false;
+  if (wakeLock) return true;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLockActive = true;
+    // 顯示 badge
+    const badge = document.getElementById('wakelock-badge');
+    if (badge) badge.style.display = '';
+    wakeLock.addEventListener('release', () => {
+      console.log('Wake Lock released');
+      wakeLock = null;
+      // 如果是主動關閉（wakeLockActive=false），隱藏 badge
+      // 如果是系統釋放（背景），badge 保留但會在前景時重新申請
+    });
+    console.log('Wake Lock activated');
+    return true;
+  } catch (e) {
+    console.error('Wake Lock request failed:', e);
+    wakeLock = null;
+    return false;
+  }
+}
+
+// 釋放 Wake Lock
+async function releaseWakeLock() {
+  wakeLockActive = false;
+  // 隱藏 badge
+  const badge = document.getElementById('wakelock-badge');
+  if (badge) badge.style.display = 'none';
+  if (wakeLock) {
+    try {
+      await wakeLock.release();
+    } catch (e) {
+      console.error('Wake Lock release failed:', e);
+    }
+    wakeLock = null;
+  }
+}
+
+// 切回前景時，如果還在記錄中就重新申請（背景時系統會自動釋放）
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && wakeLockActive && !wakeLock) {
+    await requestWakeLock();
+  }
+});
+
+// 60 秒後自動關閉
   setTimeout(() => div.remove(), 60000);
 }
 
